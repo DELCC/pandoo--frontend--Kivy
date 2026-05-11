@@ -2,7 +2,7 @@ import cv2
 import urllib.request
 import numpy as np
 import requests
-import threading
+import re
 from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.clock import Clock
@@ -13,12 +13,115 @@ from kivy.lang import Builder
 
 # --- CONFIGURATION ---
 URL_IMAGE = "http://192.168.1.157:8080/shot.jpg"
-MY_API_URL = "http://127.0.0.1:8000/products/"
 
 Builder.load_string('''
 <WindowManager>:
+    StartScreen:
+    CreateUserScreen:
+    AddChildScreen:
     ScanScreen:
     DetailsScreen:
+
+<StartScreen>:
+    name: "start"
+    BoxLayout:
+        orientation: 'vertical'
+        padding: 40
+        spacing: 20
+        canvas.before:
+            Color:
+                rgba: (0.1, 0.1, 0.1, 1)
+            Rectangle:
+                pos: self.pos
+                size: self.size
+        Label:
+            text: "PANDOO 🐼"
+            font_size: '48sp'
+            bold: True
+            color: (0.2, 0.8, 0.4, 1)
+            size_hint_y: 0.4
+        Button:
+            text: "SE CONNECTER"
+            size_hint_y: None
+            height: '60dp'
+            background_color: (0.2, 0.6, 1, 1)
+            on_release: root.manager.current = "scan"
+        Button:
+            text: "CRÉER UN COMPTE"
+            size_hint_y: None
+            height: '60dp'
+            background_color: (1, 1, 1, 0.1)
+            on_release: root.manager.current = "create_user"
+
+<CreateUserScreen>:
+    name: "create_user"
+    BoxLayout:
+        orientation: 'vertical'
+        padding: 30
+        spacing: 15
+        canvas.before:
+            Color:
+                rgba: (0.1, 0.1, 0.1, 1)
+            Rectangle:
+                pos: self.pos
+                size: self.size
+        Label:
+            text: "INSCRIPTION PARENT"
+            font_size: '22sp'
+            bold: True
+        TextInput:
+            id: name_input
+            hint_text: "Nom"
+            multiline: False
+        TextInput:
+            id: email_input
+            hint_text: "Email"
+            multiline: False
+        TextInput:
+            id: password_input
+            hint_text: "Mot de passe"
+            password: True
+            multiline: False
+        Label:
+            id: error_label
+            text: ""
+            color: (1, 0.3, 0.3, 1)
+        Button:
+            text: "SUIVANT"
+            size_hint_y: None
+            height: '60dp'
+            background_color: (0.2, 0.8, 0.4, 1)
+            on_release: root.register_user()
+
+<AddChildScreen>:
+    name: "add_child"
+    BoxLayout:
+        orientation: 'vertical'
+        padding: 30
+        spacing: 15
+        canvas.before:
+            Color:
+                rgba: (0.1, 0.1, 0.1, 1)
+            Rectangle:
+                pos: self.pos
+                size: self.size
+        Label:
+            text: "PROFIL ENFANT"
+            bold: True
+        TextInput:
+            id: child_name
+            hint_text: "Prénom enfant"
+        TextInput:
+            id: child_age
+            hint_text: "Âge"
+            input_filter: 'int'
+        Label:
+            id: child_error
+            text: ""
+            color: (1, 0.3, 0.3, 1)
+        Button:
+            text: "TERMINER"
+            on_release: root.create_child()
 
 <ScanScreen>:
     name: "scan"
@@ -30,7 +133,6 @@ Builder.load_string('''
         Label:
             text: app.status_text
             size_hint_y: 0.2
-            font_size: '20sp'
             bold: True
 
 <DetailsScreen>:
@@ -39,230 +141,128 @@ Builder.load_string('''
         orientation: 'vertical'
         padding: 20
         spacing: 10
-        
+        canvas.before:
+            Color:
+                rgba: (0.1, 0.1, 0.1, 1)
+            Rectangle:
+                pos: self.pos
+                size: self.size
         Label:
             text: app.product_name
             font_size: '24sp'
             bold: True
+            color: (0.2, 0.8, 0.4, 1)
             size_hint_y: None
             height: '50dp'
-            color: (0.2, 0.6, 1, 1)
-            halign: 'center'
-            valign: 'middle'
-            text_size: self.width, None
-
-        # --- LA CORRECTION : Ajout de la mention 100g ---
-        Label:
-            text: "Valeurs indiquées pour 100g"
-            font_size: '14sp'
-            italic: True
-            color: (0.8, 0.8, 0.8, 1)
-            size_hint_y: None
-            height: '30dp'
-            halign: 'center'
-
-        GridLayout:
-            cols: 2
-            spacing: 10
-            padding: 15
-            canvas.before:
-                Color:
-                    rgba: (0.15, 0.15, 0.15, 1)
-                RoundedRectangle:
-                    pos: self.pos
-                    size: self.size
-                    radius: [10,]
-            
-            # --- Lignes nutritionnelles ---
+        ScrollView:
             Label:
-                text: "Calories:"
-                bold: True
-                halign: 'left'
-                text_size: self.size
-            Label:
-                id: val_energy
-                text: "..."
-                halign: 'right'
-                text_size: self.size
-
-            Label:
-                text: "Glucides:"
-                bold: True
-                halign: 'left'
-                text_size: self.size
-            Label:
-                id: val_glucides
-                text: "..."
-                halign: 'right'
-                text_size: self.size
-
-            Label:
-                text: "Lipides:"
-                bold: True
-                halign: 'left'
-                text_size: self.size
-            Label:
-                id: val_fat
-                text: "..."
-                halign: 'right'
-                text_size: self.size
-
-            Label:
-                text: "Protéines:"
-                bold: True
-                halign: 'left'
-                text_size: self.size
-            Label:
-                id: val_proteins
-                text: "..."
-                halign: 'right'
-                text_size: self.size
-
-            Label:
-                text: "Sel:"
-                bold: True
-                halign: 'left'
-                text_size: self.size
-            Label:
-                id: val_salt
-                text: "..."
-                halign: 'right'
-                text_size: self.size
-
-            Label:
-                text: "Calcium:"
-                bold: True
-                halign: 'left'
-                text_size: self.size
-            Label:
-                id: val_calcium
-                text: "..."
-                halign: 'right'
-                text_size: self.size
-
+                text: app.nutrition_info
+                size_hint_y: None
+                height: self.texture_size[1]
+                text_size: self.width, None
+                halign: 'center'
         Button:
-            text: "FERMER ET REVENIR AU SCAN"
+            text: "RETOUR"
             size_hint_y: None
-            height: '65dp'
-            background_color: (0.9, 0.2, 0.2, 1)
-            background_normal: ''
-            bold: True
+            height: '60dp'
             on_release: root.manager.current = "scan"
 ''')
 
+class StartScreen(Screen): pass
+
+class CreateUserScreen(Screen):
+    def register_user(self):
+        user_data = {
+            "name": self.ids.name_input.text,
+            "email": self.ids.email_input.text,
+            "password": self.ids.password_input.text
+        }
+        try:
+            res = requests.post("http://127.0.0.1:8000/users/", json=user_data, timeout=5)
+            if res.status_code == 200:
+                App.get_running_app().user_id = res.json()["user"]["id"]
+                self.manager.current = "add_child"
+            else:
+                self.ids.error_label.text = "Erreur inscription"
+        except: self.ids.error_label.text = "Serveur injoignable"
+
+class AddChildScreen(Screen):
+    def create_child(self):
+        app = App.get_running_app()
+        child_data = {
+            "name": self.ids.child_name.text,
+            "age": int(self.ids.child_age.text or 0),
+            "id_parent": app.user_id
+        }
+        try:
+            url = f"http://127.0.0.1:8000/children/{app.user_id}"
+            res = requests.post(url, json=child_data, timeout=5)
+            if res.status_code == 200: self.manager.current = "scan"
+        except: self.ids.child_error.text = "Erreur enfant"
+
 class ScanScreen(Screen):
     def on_enter(self):
-        app = App.get_running_app()
-        app.status_text = "Prêt à scanner"
-        self.last_scanned = None
-        self.update_event = Clock.schedule_interval(self.update, 1.0 / 60.0)
-
+        self.update_event = Clock.schedule_interval(self.update, 1.0 / 30.0)
     def on_leave(self):
         Clock.unschedule(self.update_event)
 
     def update(self, dt):
         try:
-            img_resp = urllib.request.urlopen(URL_IMAGE, timeout=2)
+            img_resp = urllib.request.urlopen(URL_IMAGE, timeout=1)
             img_np = np.array(bytearray(img_resp.read()), dtype=np.uint8)
             frame = cv2.imdecode(img_np, -1)
             if frame is not None:
-                barcodes = decode(frame)
-                for barcode in barcodes:
+                for barcode in decode(frame):
                     code = barcode.data.decode('utf-8')
-                    if code != self.last_scanned:
-                        self.last_scanned = code
-                        threading.Thread(target=self.process_new_scan, args=(code,)).start()
+                    if code.isdigit():
+                        Clock.unschedule(self.update_event)
+                        App.get_running_app().fetch_details(code)
+                        self.manager.current = "details"
                 
                 buf = cv2.flip(frame, 0).tobytes()
                 texture = Texture.create(size=(frame.shape[1], frame.shape[0]), colorfmt='bgr')
                 texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
                 self.ids.camera_preview.texture = texture
-        except:
-            pass
-
-    def process_new_scan(self, code):
-        app = App.get_running_app()
-        Clock.schedule_once(lambda dt: setattr(app, 'status_text', "RECHERCHE..."))
-        
-        try:
-            headers = {'User-Agent': 'PandooApp - 1.0'}
-            url = f"https://world.openfoodfacts.org/api/v2/product/{code}"
-            res = requests.get(url, headers=headers, timeout=5)
-            
-            if res.status_code == 200:
-                data = res.json()
-                if data.get('status') == 1:
-                    p = data.get('product', {})
-                    nut = p.get('nutriments', {})
-                    
-                    payload = {
-                        "barcode": int(code),
-                        "type": "Alimentation",
-                        "name": str(p.get('product_name_fr') or p.get('product_name') or "Article"),
-                        "brand": str(p.get('brands', 'INCONNU').split(',')[0].strip()),
-                        "calories": float(nut.get('energy-kcal_100g', 0.0)),
-                        "glucides": float(nut.get('carbohydrates_100g', 0.0)),
-                        "calcium": float(nut.get('calcium_100g', 0.0)),
-                        "proteins": float(nut.get('proteins_100g', 0.0)),
-                        "lipids": float(nut.get('fat_100g', 0.0)),
-                        "salt": float(nut.get('salt_100g', 0.0))
-                    }
-                    
-                    Clock.schedule_once(lambda dt: self.update_details_ui(payload))
-                    Clock.schedule_once(lambda dt: self.switch_to_details())
-                    self.send_to_backend(payload)
-                else:
-                    Clock.schedule_once(lambda dt: setattr(app, 'status_text', "Produit inconnu"))
-        except Exception as e:
-            print(f"Erreur: {e}")
-
-    def update_details_ui(self, p):
-        app = App.get_running_app()
-        app.product_name = f"{p['brand'].upper()} - {p['name']}"
-        
-        ds = app.root.get_screen('details')
-        ds.ids.val_energy.text = f"{p['calories']} kcal"
-        ds.ids.val_glucides.text = f"{p['glucides']} g"
-        ds.ids.val_fat.text = f"{p['lipids']} g"
-        ds.ids.val_proteins.text = f"{p['proteins']} g"
-        ds.ids.val_salt.text = f"{p['salt']} g"
-        ds.ids.val_calcium.text = f"{p['calcium']} mg"
-
-    def switch_to_details(self):
-        self.manager.current = "details"
-
-    def send_to_backend(self, data):
-        try:
-            target_url = "http://127.0.0.1:8000/products/?id_child=1"
-            res = requests.post(target_url, json=data, timeout=5)
-            
-            if res.status_code == 200:
-                # Le backend renvoie le produit (existant ou nouveau)
-                server_data = res.json()
-                
-                # On peut vérifier si le message de log du backend contenait "déjà existant"
-                # Ou plus simplement, si le backend est configuré pour renvoyer 200, 
-                # on affiche un message clair ici.
-                
-                # Pour un affichage précis, on se base sur la logique du backend :
-                print(f"--- [API INFO] ---")
-                print(f"Produit : {data['name']}")
-                # On affiche le message de succès uniquement
-                print(f"✅ Opération réussie (Article déjà stocké dans l'API)")
-            
-            # Note : Si tu veux un message "DÉJÀ ENREGISTRÉ" spécifique dans Kivy,
-            # il est préférable que le Backend renvoie un code 201 pour "créé" 
-            # et 200 pour "déjà présent".
-        except Exception as e:
-            print(f"❌ Backend injoignable : {e}")
+        except: pass
 
 class DetailsScreen(Screen): pass
 class WindowManager(ScreenManager): pass
 
 class PandooApp(App):
-    product_name = StringProperty("")
-    status_text = StringProperty("Prêt à scanner")
-    
+    product_name = StringProperty("Produit")
+    nutrition_info = StringProperty("")
+    status_text = StringProperty("Prêt pour le scan")
+    user_id = None
+
+    def fetch_details(self, code):
+        # ON AJOUTE UN HEADER POUR ÉVITER L'ERREUR 403
+        headers = {'User-Agent': 'PandooApp - Android - Version 1.0 - contact@pandoo.com'}
+        
+        try:
+            url = f"https://world.openfoodfacts.org/api/v0/product/{code}.json"
+            res = requests.get(url, headers=headers, timeout=5)
+            
+            if res.status_code == 200:
+                data = res.json()
+                if data.get("status") == 1:
+                    p = data["product"]
+                    n = p.get("nutriments", {})
+                    self.product_name = p.get("product_name", "Inconnu")
+                    self.nutrition_info = (
+                        f"⚡ Calories : {n.get('energy-kcal_100g', 'N/A')} kcal\n"
+                        f"🍭 Sucres : {n.get('sugars_100g', 'N/A')} g\n"
+                        f"🧂 Sel : {n.get('salt_100g', 'N/A')} g\n"
+                        f"🥩 Protéines : {n.get('proteins_100g', 'N/A')} g"
+                    )
+                else:
+                    self.product_name = "Non trouvé"
+                    self.nutrition_info = "Code inconnu d'OpenFoodFacts."
+            else:
+                self.product_name = f"Erreur {res.status_code}"
+                self.nutrition_info = "Accès refusé par OpenFoodFacts."
+        except Exception as e:
+            self.nutrition_info = f"Erreur de connexion : {e}"
+
     def build(self):
         return WindowManager()
 
