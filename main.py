@@ -19,6 +19,7 @@ Builder.load_string('''
     StartScreen:
     CreateUserScreen:
     AddChildScreen:
+    LoginScreen:
     ScanScreen:
     DetailsScreen:
 
@@ -45,7 +46,7 @@ Builder.load_string('''
             size_hint_y: None
             height: '60dp'
             background_color: (0.2, 0.6, 1, 1)
-            on_release: root.manager.current = "scan"
+            on_release: root.manager.current = "login"
         Button:
             text: "CRÉER UN COMPTE"
             size_hint_y: None
@@ -123,6 +124,48 @@ Builder.load_string('''
             text: "TERMINER"
             on_release: root.create_child()
 
+<LoginScreen>:
+    name: "login"
+    BoxLayout:
+        orientation: 'vertical'
+        padding: 30
+        spacing: 15
+        canvas.before:
+            Color:
+                rgba: (0.1, 0.1, 0.1, 1)
+            Rectangle:
+                pos: self.pos
+                size: self.size
+        Label:
+            text: "CONNEXION"
+            font_size: '24sp'
+            bold: True
+        TextInput:
+            id: login_email
+            hint_text: "Email"
+            multiline: False
+        TextInput:
+            id: login_password
+            hint_text: "Mot de passe"
+            password: True
+            multiline: False
+        Label:
+            id: login_error
+            text: ""
+            color: (1, 0.3, 0.3, 1)
+        Button:
+            text: "S'IDENTIFIER"
+            size_hint_y: None
+            height: '60dp'
+            background_color: (0.2, 0.8, 0.4, 1)
+            on_release: root.login_user()
+        Button:
+            text: "RETOUR"
+            size_hint_y: None
+            height: '40dp'
+            background_color: (1, 1, 1, 0.1)
+            on_release: root.manager.current = "start"
+
 <ScanScreen>:
     name: "scan"
     BoxLayout:
@@ -197,8 +240,37 @@ class AddChildScreen(Screen):
         try:
             url = f"http://127.0.0.1:8000/children/{app.user_id}"
             res = requests.post(url, json=child_data, timeout=5)
-            if res.status_code == 200: self.manager.current = "scan"
-        except: self.ids.child_error.text = "Erreur enfant"
+            if res.status_code == 200:
+                # Redirection vers la connexion après la création réussie
+                self.manager.current = "login"
+        except: 
+            self.ids.child_error.text = "Erreur création enfant"
+
+class LoginScreen(Screen):
+    def login_user(self):
+        email = self.ids.login_email.text.strip()
+        password = self.ids.login_password.text.strip()
+        
+        if not email or not password:
+            self.ids.login_error.text = "Champs manquants"
+            return
+            
+        login_data = {"email": email, "password": password}
+        
+        try:
+            # Envoi vers ton futur endpoint de login
+            res = requests.post("http://127.0.0.1:8000/login", json=login_data, timeout=5)
+            if res.status_code == 200:
+                data = res.json()
+                App.get_running_app().user_id = data.get("id")
+                self.manager.current = "scan"
+            else:
+                self.ids.login_error.text = "Email ou mot de passe incorrect"
+        except:
+            # Pour tes tests si le backend login n'est pas prêt, 
+            # tu peux décommenter la ligne suivante pour forcer l'accès :
+            # self.manager.current = "scan"
+            self.ids.login_error.text = "Serveur injoignable"
 
 class ScanScreen(Screen):
     def on_enter(self):
@@ -235,12 +307,11 @@ class PandooApp(App):
     user_id = None
 
     def fetch_details(self, code):
-        # ON AJOUTE UN HEADER POUR ÉVITER L'ERREUR 403
-        headers = {'User-Agent': 'PandooApp - Android - Version 1.0 - contact@pandoo.com'}
-        
+        headers = {'User-Agent': 'PandooApp - Android - contact@pandoo.com'}
         try:
             url = f"https://world.openfoodfacts.org/api/v0/product/{code}.json"
             res = requests.get(url, headers=headers, timeout=5)
+            res.encoding = 'utf-8' # Gestion des accents
             
             if res.status_code == 200:
                 data = res.json()
@@ -256,12 +327,11 @@ class PandooApp(App):
                     )
                 else:
                     self.product_name = "Non trouvé"
-                    self.nutrition_info = "Code inconnu d'OpenFoodFacts."
+                    self.nutrition_info = "Code inconnu."
             else:
                 self.product_name = f"Erreur {res.status_code}"
-                self.nutrition_info = "Accès refusé par OpenFoodFacts."
         except Exception as e:
-            self.nutrition_info = f"Erreur de connexion : {e}"
+            self.nutrition_info = f"Erreur : {e}"
 
     def build(self):
         return WindowManager()
