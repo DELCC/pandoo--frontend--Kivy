@@ -18,6 +18,11 @@ URL_IMAGE = "http://192.168.1.157:8080/shot.jpg"
 BACKEND_URL = "http://127.0.0.1:8000"
 
 Builder.load_string('''
+# 1. Définition de la classe personnalisée pour l'icône
+<EyeButton@ButtonBehavior+AnchorLayout>:
+    size_hint_x: None
+    width: '50dp'
+
 <WindowManager>:
     StartScreen:
     CreateUserScreen:
@@ -71,23 +76,49 @@ Builder.load_string('''
 <StyledTextInput@TextInput>:
     background_normal: ''
     background_active: ''
-    background_disabled_normal: ''
-    background_color: (0, 0, 0, 0)
-    foreground_color: (0, 0, 0, 1)  # FORCE LE TEXTE EN NOIR
+    background_color: (0.92, 0.92, 0.92, 1)
+    foreground_color: (0, 0, 0, 1)
+    cursor_color: (0.2, 0.8, 0.5, 1)
+    cursor_width: '2dp'
     hint_text_color: (0.5, 0.5, 0.5, 1)
-    cursor_color: (0, 0, 0, 1)      # CURSEUR NOIR AUSSI
     padding: [15, 12, 15, 12]
     multiline: False
     write_tab: False
+
+<PasswordInput@BoxLayout>:
+    orientation: 'horizontal'
+    size_hint_y: None
+    height: '55dp'
+    spacing: 0
+    hint_text: ""
     canvas.before:
         Color:
-            rgba: (0.92, 0.92, 0.92, 1) # Fond gris clair
+            rgba: (0.92, 0.92, 0.92, 1)
         RoundedRectangle:
             pos: self.pos
             size: self.size
             radius: [12,]
-        Color:
-            rgba: (0, 0, 0, 1) # Prépare la couleur noire pour le rendu du texte
+    TextInput:
+        id: ti
+        hint_text: root.hint_text
+        password: True
+        background_normal: ''
+        background_active: ''
+        background_color: (0,0,0,0)
+        foreground_color: (0, 0, 0, 1)
+        cursor_color: (0.2, 0.8, 0.5, 1)
+        cursor_width: '2dp'
+        hint_text_color: (0.5, 0.5, 0.5, 1)
+        padding: [15, 15, 15, 15]
+        multiline: False
+    
+    # 2. Utilisation de la classe EyeButton définie plus haut
+    EyeButton:
+        on_release: ti.password = not ti.password
+        Image:
+            source: 'eye_off.png' if ti.password else 'eye_on.png'
+            size_hint: None, None
+            size: '25dp', '25dp'
 
 <StartScreen>:
     name: "start"
@@ -156,11 +187,9 @@ Builder.load_string('''
                 hint_text: "Email (ex: test@test.com)"
                 size_hint_y: None
                 height: '45dp'
-            StyledTextInput:
-                id: new_pass
+            PasswordInput:
+                id: new_pass_container
                 hint_text: "Mot de passe"
-                password: True
-                size_hint_y: None
                 height: '45dp'
             Label:
                 id: error_label
@@ -247,12 +276,9 @@ Builder.load_string('''
                 hint_text: "Nom d'utilisateur"
                 size_hint_y: None
                 height: '55dp'
-            StyledTextInput:
-                id: login_pass
+            PasswordInput:
+                id: login_pass_container
                 hint_text: "Mot de passe"
-                password: True
-                size_hint_y: None
-                height: '55dp'
             RoundedButton:
                 text: "ENTRER"
                 size_hint_y: None
