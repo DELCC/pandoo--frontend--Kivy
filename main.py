@@ -11,6 +11,8 @@ from kivy.graphics.texture import Texture
 from kivy.properties import StringProperty, DictProperty
 from pyzbar.pyzbar import decode
 from kivy.lang import Builder
+from kivy.uix.behaviors import ButtonBehavior
+from kivy.uix.boxlayout import BoxLayout
 
 # --- CONFIGURATION ---
 URL_IMAGE = "http://10.0.7.196:8080/shot.jpg" 
@@ -25,6 +27,38 @@ Builder.load_string('''
     ScanScreen:
     DetailsScreen:
 
+<BackButton@ButtonBehavior+BoxLayout>:
+    size_hint: None, None
+    size: '110dp', '40dp'
+    orientation: 'horizontal'
+    padding: ['10dp', 0]
+    spacing: '5dp'
+    canvas.before:
+        Color:
+            rgba: (0.2, 0.8, 0.5, 0.1) if self.state == 'normal' else (0.2, 0.8, 0.5, 0.2)
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [10,]
+    Widget:
+        size_hint: None, None
+        size: '15dp', '40dp'
+        canvas:
+            Color:
+                rgba: (0.2, 0.8, 0.5, 1)
+            Line:
+                points: [self.x + 12, self.y + 26, self.x + 4, self.y + 20, self.x + 12, self.y + 14]
+                width: 1.3
+                cap: 'round'
+                joint: 'round'
+    Label:
+        text: "Retour"
+        color: (0.2, 0.8, 0.5, 1)
+        font_size: '15sp'
+        halign: 'left'
+        valign: 'middle'
+        text_size: self.size
+
 <RoundedButton@Button>:
     background_color: (0, 0, 0, 0)
     canvas.before:
@@ -36,11 +70,47 @@ Builder.load_string('''
             radius: [25,]
 
 <StyledTextInput@TextInput>:
-    background_color: (0.15, 0.15, 0.15, 1)
-    foreground_color: (1, 1, 1, 1)
+    # Désactivation des styles par défaut
+    background_normal: ''
+    background_active: ''
+    background_disabled_normal: ''
+    background_color: (0, 0, 0, 0)
+    
+    # Configuration du texte (Noir pur)
+    foreground_color: (0, 0, 0, 1)
+    hint_text_color: (0.4, 0.4, 0.4, 1)
     cursor_color: (0.2, 0.8, 0.5, 1)
-    padding: [15, 15]
+    
+    padding: [15, 12, 15, 12]
     multiline: False
+
+    canvas.before:
+        # 1. Dessin du fond (Gris clair)
+        Color:
+            rgba: (0.92, 0.92, 0.92, 1)
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [12,]
+        
+        # 2. Le petit dégradé interne (ombre haute)
+        Color:
+            rgba: (0, 0, 0, 0.1)
+        Line:
+            points: [self.x + 15, self.top - 2, self.right - 15, self.top - 2]
+            width: 1.5
+            
+        # 3. La bordure grise
+        Color:
+            rgba: (0.8, 0.8, 0.8, 1)
+        Line:
+            rounded_rectangle: (self.x, self.y, self.width, self.height, 12)
+            width: 1
+            
+        # --- LA SOLUTION CRUCIALE ---
+        # On force la couleur de rendu du texte à NOIR juste avant que Kivy ne le dessine
+        Color:
+            rgba: (0, 0, 0, 1)
 
 <StartScreen>:
     name: "start"
@@ -76,50 +146,57 @@ Builder.load_string('''
     name: "create_user"
     BoxLayout:
         orientation: 'vertical'
-        padding: [40, 30]
-        spacing: 12
         canvas.before:
             Color:
                 rgba: (0.08, 0.08, 0.08, 1)
             Rectangle:
                 pos: self.pos
                 size: self.size
-        Label:
-            text: "INSCRIPTION"
-            font_size: '24sp'
-            color: (0.2, 0.8, 0.5, 1)
-        StyledTextInput:
-            id: new_user
-            hint_text: "Nom d'utilisateur"
+        AnchorLayout:
+            anchor_x: 'left'
+            anchor_y: 'top'
             size_hint_y: None
-            height: '45dp'
-        StyledTextInput:
-            id: new_email
-            hint_text: "Email"
-            size_hint_y: None
-            height: '45dp'
-        StyledTextInput:
-            id: new_pass
-            hint_text: "Mot de passe"
-            password: True
-            size_hint_y: None
-            height: '45dp'
-        Label:
-            id: error_label
-            text: ""
-            color: (1, 0.3, 0.3, 1)
-            font_size: '12sp'
-            size_hint_y: None
-            height: '30dp'
-        RoundedButton:
-            text: "VALIDER"
-            size_hint_y: None
-            height: '55dp'
-            on_release: root.validate_and_create()
-        Button:
-            text: "Retour"
-            background_color: (0,0,0,0)
-            on_release: root.manager.current = "start"
+            height: '70dp'
+            padding: [10, 10]
+            BackButton:
+                on_release: root.manager.current = "start"
+        BoxLayout:
+            orientation: 'vertical'
+            padding: [40, 0, 40, 30]
+            spacing: 12
+            Label:
+                text: "INSCRIPTION"
+                font_size: '24sp'
+                color: (0.2, 0.8, 0.5, 1)
+                bold: True
+            StyledTextInput:
+                id: new_user
+                hint_text: "Nom d'utilisateur"
+                size_hint_y: None
+                height: '45dp'
+            StyledTextInput:
+                id: new_email
+                hint_text: "Email"
+                size_hint_y: None
+                height: '45dp'
+            StyledTextInput:
+                id: new_pass
+                hint_text: "Mot de passe"
+                password: True
+                size_hint_y: None
+                height: '45dp'
+            Label:
+                id: error_label
+                text: ""
+                color: (1, 0.3, 0.3, 1)
+                font_size: '12sp'
+                size_hint_y: None
+                height: '30dp'
+            RoundedButton:
+                text: "VALIDER"
+                size_hint_y: None
+                height: '55dp'
+                on_release: root.validate_and_create()
 
 <AddChildScreen>:
     name: "add_child"
@@ -137,6 +214,7 @@ Builder.load_string('''
             text: "TON ENFANT"
             font_size: '24sp'
             color: (0.2, 0.8, 0.5, 1)
+            bold: True
         StyledTextInput:
             id: child_name
             hint_text: "Prénom de l'enfant"
@@ -164,38 +242,45 @@ Builder.load_string('''
     name: "login"
     BoxLayout:
         orientation: 'vertical'
-        padding: [40, 60]
-        spacing: 20
         canvas.before:
             Color:
                 rgba: (0.08, 0.08, 0.08, 1)
             Rectangle:
                 pos: self.pos
                 size: self.size
-        Label:
-            text: "CONNEXION"
-            font_size: '32sp'
-            color: (0.2, 0.8, 0.5, 1)
-        StyledTextInput:
-            id: login_user
-            hint_text: "Nom d'utilisateur"
+        AnchorLayout:
+            anchor_x: 'left'
+            anchor_y: 'top'
             size_hint_y: None
-            height: '55dp'
-        StyledTextInput:
-            id: login_pass
-            hint_text: "Mot de passe"
-            password: True
-            size_hint_y: None
-            height: '55dp'
-        RoundedButton:
-            text: "ENTRER"
-            size_hint_y: None
-            height: '60dp'
-            on_release: root.login_user()
-        Button:
-            text: "Retour"
-            background_color: (0,0,0,0)
-            on_release: root.manager.current = "start"
+            height: '70dp'
+            padding: [10, 10]
+            BackButton:
+                on_release: root.manager.current = "start"
+        BoxLayout:
+            orientation: 'vertical'
+            padding: [40, 0, 40, 60]
+            spacing: 20
+            Label:
+                text: "CONNEXION"
+                font_size: '32sp'
+                color: (0.2, 0.8, 0.5, 1)
+                bold: True
+            StyledTextInput:
+                id: login_user
+                hint_text: "Nom d'utilisateur"
+                size_hint_y: None
+                height: '55dp'
+            StyledTextInput:
+                id: login_pass
+                hint_text: "Mot de passe"
+                password: True
+                size_hint_y: None
+                height: '55dp'
+            RoundedButton:
+                text: "ENTRER"
+                size_hint_y: None
+                height: '60dp'
+                on_release: root.login_user()
 
 <ScanScreen>:
     name: "scan"
@@ -216,6 +301,7 @@ Builder.load_string('''
             text: app.status_text
             size_hint_y: 0.2
             color: (0.2, 0.8, 0.5, 1)
+            bold: True
 
 <DetailsScreen>:
     name: "details"
@@ -230,16 +316,46 @@ Builder.load_string('''
                 pos: self.pos
                 size: self.size
         Label:
-            text: app.product_name
-            font_size: '24sp'
+            text: "ANALYSE"
+            font_size: '22sp'
             bold: True
             color: (0.2, 0.8, 0.5, 1)
-            text_size: self.width, None
-            halign: 'center'
-        Label:
-            text: app.nutrition_info
-            font_size: '18sp'
-            halign: 'center'
+            size_hint_y: None
+            height: '40dp'
+        BoxLayout:
+            orientation: 'vertical'
+            padding: 20
+            spacing: 5
+            canvas.before:
+                Color:
+                    rgba: (0.15, 0.15, 0.15, 1)
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [20]
+            Label:
+                text: app.product_brand
+                font_size: '18sp'
+                color: (0.6, 0.6, 0.6, 1)
+                halign: 'center'
+                size_hint_y: None
+                height: '30dp'
+            Label:
+                text: app.product_name
+                font_size: '26sp'
+                bold: True
+                color: (0.2, 0.8, 0.5, 1)
+                halign: 'center'
+                text_size: self.width, None
+            Widget:
+                size_hint_y: None
+                height: '20dp'
+            Label:
+                text: app.nutrition_info
+                font_size: '18sp'
+                halign: 'center'
+                valign: 'top'
+                text_size: self.width, None
         RoundedButton:
             text: "SCANNER À NOUVEAU"
             size_hint_y: None
@@ -247,8 +363,10 @@ Builder.load_string('''
             on_release: root.manager.current = "scan"
 ''')
 
-# --- LOGIQUE ---
+# --- CLASSES AUXILIAIRES ---
+class BackButton(ButtonBehavior, BoxLayout): pass
 
+# --- LOGIQUE DES ÉCRANS ---
 class StartScreen(Screen): pass
 
 class CreateUserScreen(Screen):
@@ -256,58 +374,32 @@ class CreateUserScreen(Screen):
         username = self.ids.new_user.text
         email = self.ids.new_email.text
         password = self.ids.new_pass.text
-        
-        payload = {
-            "name": username,
-            "email": email,
-            "password": password
-        }
-
+        payload = {"name": username, "email": email, "password": password}
         try:
             res = requests.post(f"{BACKEND_URL}/users/", json=payload, timeout=5)
-            
             if res.status_code in [200, 201]:
                 user_data = res.json()
-                # TRÈS IMPORTANT : On récupère l'ID réel envoyé par ton API (ex: 1, 2, 3...)
                 App.get_running_app().user_id = user_data["id"] 
-                
-                print(f"✅ Utilisateur créé ! ID récupéré : {user_data['id']}")
                 self.manager.current = "add_child"
             else:
                 self.ids.error_label.text = f"Erreur API : {res.status_code}"
-        except Exception as e:
+        except:
             self.ids.error_label.text = "Erreur de connexion"
-            print(f"Erreur : {e}")
 
 class AddChildScreen(Screen):
     def create_child(self):
         name = self.ids.child_name.text
         age_text = self.ids.child_age.text
-        parent_id = App.get_running_app().user_id # On récupère l'ID
-
+        parent_id = App.get_running_app().user_id
         if name.strip() == "" or age_text.strip() == "":
             self.ids.child_error.text = "Champs requis !"
             return
-
         try:
-            # MODIFICATION ICI : on ajoute "id_parent" dans le dictionnaire
-            payload = {
-                "name": name,
-                "age": int(age_text),
-                "id_parent": parent_id 
-            }
-
-            res = requests.post(
-                f"{BACKEND_URL}/children/{parent_id}", 
-                json=payload, 
-                timeout=5
-            )
-            
+            payload = {"name": name, "age": int(age_text), "id_parent": parent_id}
+            res = requests.post(f"{BACKEND_URL}/children/{parent_id}", json=payload, timeout=5)
             if res.status_code in [200, 201]:
-                print(f"✅ Enfant {name} enregistré !")
                 self.manager.current = "login"
             else:
-                print(f"Détail erreur: {res.json()}") # Pour voir ce qui manque
                 self.ids.child_error.text = "Erreur de validation."
         except:
             self.ids.child_error.text = "Serveur déconnecté"
@@ -346,6 +438,7 @@ class WindowManager(ScreenManager): pass
 
 class PandooApp(App):
     product_name = StringProperty("Chargement...")
+    product_brand = StringProperty("Marque")
     nutrition_info = StringProperty("")
     status_text = StringProperty("Alignez le code-barres")
     nutrition_data = DictProperty({})
@@ -363,6 +456,7 @@ class PandooApp(App):
                     p = data["product"]
                     n = p.get("nutriments", {})
                     self.product_name = p.get("product_name", "Inconnu")
+                    self.product_brand = p.get("brands", "Marque Inconnue").split(',')[0]
                     self.nutrition_data = {
                         "calories": float(n.get('energy-kcal_100g', 0)),
                         "glucides": float(n.get('sugars_100g', 0)),
@@ -381,7 +475,7 @@ class PandooApp(App):
     def save_to_backend(self, code):
         payload = {
             "barcode": str(code), "name": self.product_name, "type": "Alimentation",
-            "brand": "Inconnu", "calories": self.nutrition_data.get('calories', 0.0),
+            "brand": self.product_brand, "calories": self.nutrition_data.get('calories', 0.0),
             "glucides": self.nutrition_data.get('glucides', 0.0),
             "proteins": self.nutrition_data.get('proteins', 0.0),
             "lipids": 0.0, "salt": self.nutrition_data.get('salt', 0.0), "calcium": 0.0
@@ -389,7 +483,6 @@ class PandooApp(App):
         try:
             json_payload = json.dumps(payload, ensure_ascii=False).encode('utf-8')
             headers = {'Content-Type': 'application/json; charset=utf-8'}
-            # id_child=1 par défaut pour tes tests
             requests.post(f"{BACKEND_URL}/products/?id_child=1", 
                           data=json_payload, headers=headers, timeout=5)
         except: pass
