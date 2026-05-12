@@ -73,18 +73,21 @@ Builder.load_string('''
     background_active: ''
     background_disabled_normal: ''
     background_color: (0, 0, 0, 0)
-    foreground_color: (0, 0, 0, 1)
-    hint_text_color: (0.4, 0.4, 0.4, 1)
-    cursor_color: (0.2, 0.8, 0.5, 1)
+    foreground_color: (0, 0, 0, 1)  # FORCE LE TEXTE EN NOIR
+    hint_text_color: (0.5, 0.5, 0.5, 1)
+    cursor_color: (0, 0, 0, 1)      # CURSEUR NOIR AUSSI
     padding: [15, 12, 15, 12]
     multiline: False
+    write_tab: False
     canvas.before:
         Color:
-            rgba: (0.92, 0.92, 0.92, 1)
+            rgba: (0.92, 0.92, 0.92, 1) # Fond gris clair
         RoundedRectangle:
             pos: self.pos
             size: self.size
             radius: [12,]
+        Color:
+            rgba: (0, 0, 0, 1) # Prépare la couleur noire pour le rendu du texte
 
 <StartScreen>:
     name: "start"
@@ -281,8 +284,8 @@ Builder.load_string('''
     name: "details"
     BoxLayout:
         orientation: 'vertical'
-        padding: [20, 20]
-        spacing: 12
+        padding: [25, 20]
+        spacing: 15
         canvas.before:
             Color:
                 rgba: (0.08, 0.08, 0.08, 1)
@@ -301,7 +304,7 @@ Builder.load_string('''
         BoxLayout:
             orientation: 'vertical'
             padding: [15, 20]
-            spacing: 5
+            spacing: 10
             canvas.before:
                 Color:
                     rgba: (0.15, 0.15, 0.15, 1)
@@ -313,10 +316,9 @@ Builder.load_string('''
             Label:
                 text: app.product_brand
                 font_size: '16sp'
-                color: (0.5, 0.5, 0.5, 1)
+                color: (0.6, 0.6, 0.6, 1)
                 size_hint_y: None
-                height: '25dp'
-                halign: 'center'
+                height: '30dp'
             
             Label:
                 text: app.product_name
@@ -327,41 +329,40 @@ Builder.load_string('''
                 valign: 'middle'
                 text_size: self.width - 40, None
                 size_hint_y: None
-                height: self.texture_size[1] + 15
-
+                height: '80dp'
+            
             Label:
                 text: "Catégorie : " + app.product_category
-                font_size: '12sp'
+                font_size: '14sp'
                 color: (0.4, 0.4, 0.4, 1)
-                italic: True
                 size_hint_y: None
-                height: '20dp'
-            
+                height: '25dp'
+
             Widget:
                 size_hint_y: None
                 height: '10dp'
 
             Label:
                 text: "( Valeurs pour 100g )"
-                font_size: '14sp'
-                bold: True
-                color: (0.2, 0.8, 0.5, 0.9)
+                font_size: '13sp'
+                italic: True
+                color: (0.2, 0.8, 0.5, 0.7)
                 size_hint_y: None
                 height: '30dp'
 
             Label:
                 text: app.nutrition_info
-                font_size: '17sp'
-                line_height: 1.3
+                font_size: '18sp'
                 halign: 'center'
                 valign: 'top'
-                text_size: self.width, None
+                text_size: self.width - 40, None
+                line_height: 1.2
                 size_hint_y: 1
 
         RoundedButton:
             text: "SCANNER À NOUVEAU"
             size_hint_y: None
-            height: '55dp'
+            height: '60dp'
             on_release: root.manager.current = "scan"
 ''')
 
