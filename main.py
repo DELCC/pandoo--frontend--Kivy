@@ -85,8 +85,6 @@ Builder.load_string('''
             pos: self.pos
             size: self.size
             radius: [12,]
-        Color:
-            rgba: (0, 0, 0, 1)
 
 <StartScreen>:
     name: "start"
@@ -283,24 +281,26 @@ Builder.load_string('''
     name: "details"
     BoxLayout:
         orientation: 'vertical'
-        padding: 25
-        spacing: 15
+        padding: [20, 20]
+        spacing: 12
         canvas.before:
             Color:
                 rgba: (0.08, 0.08, 0.08, 1)
             Rectangle:
                 pos: self.pos
                 size: self.size
+        
         Label:
-            text: "ANALYSE"
+            text: "SCAN RÉUSSI"
             font_size: '22sp'
             bold: True
             color: (0.2, 0.8, 0.5, 1)
             size_hint_y: None
             height: '40dp'
+
         BoxLayout:
             orientation: 'vertical'
-            padding: 20
+            padding: [15, 20]
             spacing: 5
             canvas.before:
                 Color:
@@ -309,38 +309,59 @@ Builder.load_string('''
                     pos: self.pos
                     size: self.size
                     radius: [20]
+            
             Label:
                 text: app.product_brand
-                font_size: '18sp'
-                color: (0.6, 0.6, 0.6, 1)
-                halign: 'center'
+                font_size: '16sp'
+                color: (0.5, 0.5, 0.5, 1)
                 size_hint_y: None
-                height: '30dp'
+                height: '25dp'
+                halign: 'center'
+            
             Label:
                 text: app.product_name
-                font_size: '26sp'
+                font_size: '24sp'
                 bold: True
                 color: (0.2, 0.8, 0.5, 1)
                 halign: 'center'
-                text_size: self.width, None
+                valign: 'middle'
+                text_size: self.width - 40, None
+                size_hint_y: None
+                height: self.texture_size[1] + 15
+
             Label:
                 text: "Catégorie : " + app.product_category
-                font_size: '14sp'
+                font_size: '12sp'
                 color: (0.4, 0.4, 0.4, 1)
-                halign: 'center'
+                italic: True
+                size_hint_y: None
+                height: '20dp'
+            
             Widget:
                 size_hint_y: None
-                height: '15dp'
+                height: '10dp'
+
+            Label:
+                text: "( Valeurs pour 100g )"
+                font_size: '14sp'
+                bold: True
+                color: (0.2, 0.8, 0.5, 0.9)
+                size_hint_y: None
+                height: '30dp'
+
             Label:
                 text: app.nutrition_info
-                font_size: '18sp'
+                font_size: '17sp'
+                line_height: 1.3
                 halign: 'center'
                 valign: 'top'
                 text_size: self.width, None
+                size_hint_y: 1
+
         RoundedButton:
             text: "SCANNER À NOUVEAU"
             size_hint_y: None
-            height: '60dp'
+            height: '55dp'
             on_release: root.manager.current = "scan"
 ''')
 
