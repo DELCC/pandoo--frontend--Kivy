@@ -3,7 +3,6 @@ import urllib.request
 import numpy as np
 import requests
 import json
-import re
 from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.clock import Clock
@@ -15,7 +14,7 @@ from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.boxlayout import BoxLayout
 
 # --- CONFIGURATION ---
-URL_IMAGE = "http://10.0.7.196:8080/shot.jpg" 
+URL_IMAGE = "http://192.168.1.157:8080/shot.jpg" 
 BACKEND_URL = "http://127.0.0.1:8000"
 
 Builder.load_string('''
@@ -70,45 +69,22 @@ Builder.load_string('''
             radius: [25,]
 
 <StyledTextInput@TextInput>:
-    # Désactivation des styles par défaut
     background_normal: ''
     background_active: ''
     background_disabled_normal: ''
     background_color: (0, 0, 0, 0)
-    
-    # Configuration du texte (Noir pur)
     foreground_color: (0, 0, 0, 1)
     hint_text_color: (0.4, 0.4, 0.4, 1)
     cursor_color: (0.2, 0.8, 0.5, 1)
-    
     padding: [15, 12, 15, 12]
     multiline: False
-
     canvas.before:
-        # 1. Dessin du fond (Gris clair)
         Color:
             rgba: (0.92, 0.92, 0.92, 1)
         RoundedRectangle:
             pos: self.pos
             size: self.size
             radius: [12,]
-        
-        # 2. Le petit dégradé interne (ombre haute)
-        Color:
-            rgba: (0, 0, 0, 0.1)
-        Line:
-            points: [self.x + 15, self.top - 2, self.right - 15, self.top - 2]
-            width: 1.5
-            
-        # 3. La bordure grise
-        Color:
-            rgba: (0.8, 0.8, 0.8, 1)
-        Line:
-            rounded_rectangle: (self.x, self.y, self.width, self.height, 12)
-            width: 1
-            
-        # --- LA SOLUTION CRUCIALE ---
-        # On force la couleur de rendu du texte à NOIR juste avant que Kivy ne le dessine
         Color:
             rgba: (0, 0, 0, 1)
 
@@ -176,7 +152,7 @@ Builder.load_string('''
                 height: '45dp'
             StyledTextInput:
                 id: new_email
-                hint_text: "Email"
+                hint_text: "Email (ex: test@test.com)"
                 size_hint_y: None
                 height: '45dp'
             StyledTextInput:
@@ -347,9 +323,14 @@ Builder.load_string('''
                 color: (0.2, 0.8, 0.5, 1)
                 halign: 'center'
                 text_size: self.width, None
+            Label:
+                text: "Catégorie : " + app.product_category
+                font_size: '14sp'
+                color: (0.4, 0.4, 0.4, 1)
+                halign: 'center'
             Widget:
                 size_hint_y: None
-                height: '20dp'
+                height: '15dp'
             Label:
                 text: app.nutrition_info
                 font_size: '18sp'
@@ -363,50 +344,58 @@ Builder.load_string('''
             on_release: root.manager.current = "scan"
 ''')
 
-# --- CLASSES AUXILIAIRES ---
+# --- CLASSES ---
 class BackButton(ButtonBehavior, BoxLayout): pass
-
-# --- LOGIQUE DES ÉCRANS ---
 class StartScreen(Screen): pass
+class DetailsScreen(Screen): pass
+class WindowManager(ScreenManager): pass
 
 class CreateUserScreen(Screen):
     def validate_and_create(self):
         username = self.ids.new_user.text
         email = self.ids.new_email.text
         password = self.ids.new_pass.text
-        payload = {"name": username, "email": email, "password": password}
+        
+        # Envoi de 'name' et 'username' pour compatibilité maximale backend
+        payload = {"name": username, "username": username, "email": email, "password": password}
+        
         try:
             res = requests.post(f"{BACKEND_URL}/users/", json=payload, timeout=5)
+            print(f"Server Response: {res.status_code} - {res.json()}")
+
             if res.status_code in [200, 201]:
                 user_data = res.json()
-                App.get_running_app().user_id = user_data["id"] 
+                # Récupération sécurisée de l'ID
+                uid = user_data.get("id") or user_data.get("id_user") or 1
+                App.get_running_app().user_id = uid
                 self.manager.current = "add_child"
+            elif res.status_code == 422:
+                self.ids.error_label.text = "Erreur : Email ou format invalide"
             else:
-                self.ids.error_label.text = f"Erreur API : {res.status_code}"
-        except:
-            self.ids.error_label.text = "Erreur de connexion"
+                self.ids.error_label.text = f"Erreur serveur : {res.status_code}"
+        except Exception as e:
+            print(f"Network Error: {e}")
+            self.ids.error_label.text = "Erreur de connexion au serveur"
 
 class AddChildScreen(Screen):
     def create_child(self):
         name = self.ids.child_name.text
-        age_text = self.ids.child_age.text
+        age = self.ids.child_age.text
         parent_id = App.get_running_app().user_id
-        if name.strip() == "" or age_text.strip() == "":
-            self.ids.child_error.text = "Champs requis !"
+        if not name or not age: 
+            self.ids.child_error.text = "Veuillez remplir tous les champs"
             return
         try:
-            payload = {"name": name, "age": int(age_text), "id_parent": parent_id}
+            payload = {"name": name, "age": int(age), "id_parent": parent_id}
             res = requests.post(f"{BACKEND_URL}/children/{parent_id}", json=payload, timeout=5)
             if res.status_code in [200, 201]:
                 self.manager.current = "login"
-            else:
-                self.ids.child_error.text = "Erreur de validation."
         except:
-            self.ids.child_error.text = "Serveur déconnecté"
+            self.ids.child_error.text = "Erreur de connexion"
 
 class LoginScreen(Screen):
     def login_user(self):
-        if self.ids.login_user.text != "":
+        if self.ids.login_user.text:
             self.manager.current = "scan"
 
 class ScanScreen(Screen):
@@ -427,36 +416,44 @@ class ScanScreen(Screen):
                         Clock.unschedule(self.update_event)
                         App.get_running_app().fetch_details(code)
                         self.manager.current = "details"
+                
                 buf = cv2.flip(frame, 0).tobytes()
                 texture = Texture.create(size=(frame.shape[1], frame.shape[0]), colorfmt='bgr')
                 texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
                 self.ids.camera_preview.texture = texture
         except: pass
 
-class DetailsScreen(Screen): pass
-class WindowManager(ScreenManager): pass
-
 class PandooApp(App):
     product_name = StringProperty("Chargement...")
     product_brand = StringProperty("Marque")
+    product_category = StringProperty("Alimentation")
     nutrition_info = StringProperty("")
     status_text = StringProperty("Alignez le code-barres")
     nutrition_data = DictProperty({})
     user_id = 1
 
     def fetch_details(self, code):
-        headers = {'User-Agent': 'PandooApp'}
+        headers = {'User-Agent': 'PandooApp - Python/Kivy'}
         try:
             url = f"https://world.openfoodfacts.org/api/v0/product/{code}.json"
             res = requests.get(url, headers=headers, timeout=5)
-            res.encoding = 'utf-8'
             if res.status_code == 200:
                 data = res.json()
                 if data.get("status") == 1:
                     p = data["product"]
+                    
+                    # Extraction Marque
+                    brand_raw = p.get("brands") or p.get("brands_tags", ["Inconnue"])
+                    if isinstance(brand_raw, list): brand_raw = brand_raw[0]
+                    self.product_brand = str(brand_raw).split(',')[0].strip()
+                    
+                    # Extraction Catégorie (via categories_old)
+                    cat_raw = p.get("categories_old", "Alimentation")
+                    self.product_category = str(cat_raw).split(',')[0].strip() if cat_raw else "Alimentation"
+                    
+                    self.product_name = p.get("product_name", "Produit Inconnu")
+                    
                     n = p.get("nutriments", {})
-                    self.product_name = p.get("product_name", "Inconnu")
-                    self.product_brand = p.get("brands", "Marque Inconnue").split(',')[0]
                     self.nutrition_data = {
                         "calories": float(n.get('energy-kcal_100g', 0)),
                         "glucides": float(n.get('sugars_100g', 0)),
@@ -470,22 +467,27 @@ class PandooApp(App):
                         f"🥩 Protéines : {self.nutrition_data['proteins']} g"
                     )
                     self.save_to_backend(code)
-        except: pass
+        except Exception as e:
+            print(f"OFF Error: {e}")
 
     def save_to_backend(self, code):
         payload = {
-            "barcode": str(code), "name": self.product_name, "type": "Alimentation",
-            "brand": self.product_brand, "calories": self.nutrition_data.get('calories', 0.0),
+            "barcode": str(code), 
+            "name": self.product_name, 
+            "type": self.product_category,
+            "brand": self.product_brand, 
+            "calories": self.nutrition_data.get('calories', 0.0),
             "glucides": self.nutrition_data.get('glucides', 0.0),
             "proteins": self.nutrition_data.get('proteins', 0.0),
-            "lipids": 0.0, "salt": self.nutrition_data.get('salt', 0.0), "calcium": 0.0
+            "lipids": 0.0, 
+            "salt": self.nutrition_data.get('salt', 0.0), 
+            "calcium": 0.0
         }
         try:
-            json_payload = json.dumps(payload, ensure_ascii=False).encode('utf-8')
-            headers = {'Content-Type': 'application/json; charset=utf-8'}
-            requests.post(f"{BACKEND_URL}/products/?id_child=1", 
-                          data=json_payload, headers=headers, timeout=5)
-        except: pass
+            # Envoi au format JSON automatique avec requests
+            requests.post(f"{BACKEND_URL}/products/?id_child=1", json=payload, timeout=5)
+        except Exception as e:
+            print(f"Backend Save Error: {e}")
 
     def build(self): return WindowManager()
 
