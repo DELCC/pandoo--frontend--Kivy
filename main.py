@@ -21,7 +21,7 @@ from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.boxlayout import BoxLayout
 
 # --- CONFIGURATION RÉSEAU ---
-URL_IMAGE = "http://10.0.7.196:8080/shot.jpg" 
+URL_IMAGE = "http://192.168.1.157:8080/shot.jpg" 
 BACKEND_URL = "http://127.0.0.1:8000"
 
 Builder.load_string('''
@@ -80,7 +80,6 @@ Builder.load_string('''
             size: self.size
             radius: [25,]
 
-# --- STYLE DES CHAMPS (INPUTS) UNIFIÉ ET ARRONDI ---
 <BaseInput@BoxLayout>:
     hint_text: ""
     is_password: False
@@ -347,7 +346,6 @@ Builder.load_string('''
                     height: '50dp'
                     text_size: self.width, None
                 
-                # --- ZONE CONSEILS PANDOO ---
                 Label:
                     text: app.pandoo_advice
                     font_size: '15sp'
@@ -379,6 +377,7 @@ Builder.load_string('''
                     text_size: self.width, None
                 Label:
                     text: app.nutrition_info
+                    markup: True  # --- ACTIVATION MARKUP COULEUR ---
                     font_size: '16sp'
                     color: (0.2, 0.2, 0.2, 1)
                     halign: 'left'
@@ -394,7 +393,6 @@ Builder.load_string('''
                 on_release: root.manager.current = "scan"
 ''')
 
-# --- LOGIQUE PYTHON ---
 class BackButton(ButtonBehavior, BoxLayout): pass
 class StartScreen(Screen): pass
 class DetailsScreen(Screen): pass
@@ -476,8 +474,6 @@ class ScanScreen(Screen):
                     code = barcode.data.decode('utf-8')
                     if code.isdigit():
                         Clock.unschedule(self.update_event)
-                        # On appelle directement save_to_backend qui va maintenant
-                        # déclencher l'analyse et récupérer les conseils
                         App.get_running_app().save_to_backend(code)
                         self.manager.current = "details"
                 buf = cv2.flip(frame, 0).tobytes()
@@ -493,10 +489,27 @@ class PandooApp(App):
     status_text = StringProperty("Scannez un produit")
     user_id = 1
 
+    def get_pandoo_color(self, value, type_nutri):
+        """Calcul de la couleur basé sur les seuils officiels 100g"""
+        try:
+            val = float(value)
+            # Seuils basés sur Nutri-Score / ANSES
+            thresholds = {
+                "sucres": {"orange": 13.5, "rouge": 18.0},
+                "sel": {"orange": 0.9, "rouge": 1.5}
+            }
+            limits = thresholds.get(type_nutri)
+            if not limits: return "333333"
+
+            green_limit = limits["orange"] * 0.75
+            if val <= green_limit: return "228B22"  # Vert
+            elif val <= limits["rouge"]: return "FFA500"  # Orange
+            else: return "FF0000"  # Rouge
+        except: return "333333"
+
     def save_to_backend(self, code):
         headers = {'User-Agent': 'PandooApp - Python/Kivy'}
         try:
-            # 1. On récupère d'abord les infos de Open Food Facts
             url_off = f"https://world.openfoodfacts.org/api/v0/product/{code}.json"
             res_off = requests.get(url_off, headers=headers, timeout=5)
             
@@ -507,16 +520,21 @@ class PandooApp(App):
                     n = p.get("nutriments", {})
                     brand = p.get("brands", "Inconnu").split(',')[0]
                     
-                    # Mise à jour temporaire de l'affichage
                     self.product_name = f"{p.get('product_name', 'Produit')}\n({brand})"
+                    
+                    # --- APPLICATION DES COULEURS DYNAMIQUES ---
+                    val_sucre = n.get('sugars_100g', 0)
+                    val_sel = n.get('salt_100g', 0)
+                    col_sucre = self.get_pandoo_color(val_sucre, "sucres")
+                    col_sel = self.get_pandoo_color(val_sel, "sel")
+
                     self.nutrition_info = (
                         f"Énergie : {n.get('energy-kcal_100g', 0)} kcal\n"
-                        f"Sucres : {n.get('sugars_100g', 0)} g\n"
-                        f"Sel : {n.get('salt_100g', 0)} g\n"
+                        f"Sucres : [color={col_sucre}]{val_sucre} g[/color]\n"
+                        f"Sel : [color={col_sel}]{val_sel} g[/color]\n"
                         f"Protéines : {n.get('proteins_100g', 0)} g"
                     )
 
-                    # 2. On envoie au Backend pour enregistrement et ANALYSE
                     payload = {
                         "barcode": str(code),
                         "name": p.get("product_name", "Inconnu"),
@@ -536,8 +554,6 @@ class PandooApp(App):
                     if res_back.status_code == 200:
                         data_back = res_back.json()
                         analysis = data_back.get("analysis", {})
-                        
-                        # On combine les tips et les alertes
                         all_messages = analysis.get("tips", []) + analysis.get("alerts", [])
                         if all_messages:
                             self.pandoo_advice = "\n".join(all_messages)
@@ -546,7 +562,7 @@ class PandooApp(App):
                             
         except Exception as e:
             self.product_name = "Erreur"
-            self.pandoo_advice = f"Connexion au serveur impossible"
+            self.pandoo_advice = "Connexion au serveur impossible"
 
     def build(self): return WindowManager()
 
