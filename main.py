@@ -173,7 +173,6 @@ Builder.load_string('''
                     height: '60dp'
                     on_release: root.validate_and_create()
                 
-                # --- NOUVEAU BOUTON GOOGLE ---
                 Button:
                     text: "S'INSCRIRE AVEC GOOGLE"
                     size_hint_y: None
@@ -377,25 +376,36 @@ class CreateUserScreen(Screen):
         username = self.ids.new_user.ids.ti.text
         email = self.ids.new_email.ids.ti.text
         password = self.ids.new_pass.ids.ti.text
-        
-        if not username or not email or not password: 
-            return
-            
+        if not username or not email or not password: return
         payload = {"name": username, "username": username, "email": email, "password": password}
-        
         try:
             res = requests.post(f"{BACKEND_URL}/users/", json=payload, timeout=5)
             if res.status_code in [200, 201]:
                 user_data = res.json()
                 App.get_running_app().user_id = user_data.get("id", 1)
                 self.manager.current = "add_child"
-        except: 
-            pass
+        except: pass
 
     def login_with_google(self):
-        """Ouvre le navigateur pour l'authentification Google via le backend"""
         import webbrowser
         webbrowser.open(f"{BACKEND_URL}/auth/login")
+        # Lancer le polling pour vérifier la création du compte Google (toutes les 2 sec)
+        self.check_event = Clock.schedule_interval(self.check_auth_status, 2)
+
+    def check_auth_status(self, dt):
+        try:
+            # On vérifie si l'utilisateur avec ton email Google existe maintenant
+            email_to_check = "amaury.jacobe1@gmail.com"
+            res = requests.get(f"{BACKEND_URL}/users/by-email/{email_to_check}", timeout=2)
+            
+            if res.status_code == 200:
+                user_data = res.json()
+                App.get_running_app().user_id = user_data["id"]
+                # On arrête le polling et on change d'écran
+                Clock.unschedule(self.check_event)
+                self.manager.current = "add_child"
+        except:
+            pass
 
 class AddChildScreen(Screen):
     def create_child(self):
@@ -404,8 +414,10 @@ class AddChildScreen(Screen):
         parent_id = App.get_running_app().user_id
         try:
             payload = {"name": name, "age": int(age), "id_parent": parent_id}
-            res = requests.post(f"{BACKEND_URL}/children/{parent_id}", json=payload, timeout=5)
-            if res.status_code in [200, 201]: self.manager.current = "login"
+            # Utilisation de ton routeur mis à jour
+            res = requests.post(f"{BACKEND_URL}/children/", json=payload, timeout=5)
+            if res.status_code in [200, 201]: 
+                self.manager.current = "login"
         except: pass
 
 class LoginScreen(Screen):
@@ -449,23 +461,16 @@ class PandooApp(App):
                 if data.get("status") == 1:
                     p = data["product"]
                     brand = p.get("brands", "Inconnu").split(',')[0]
-                    
-                    # Correction du titre : on utilise un vrai saut de ligne
                     self.product_name = f"{p.get('product_name', 'Produit')}\n({brand})"
-                    
                     n = p.get("nutriments", {})
-                    
-                    # Utilisation des triples guillemets pour gérer les sauts de ligne proprement
                     self.nutrition_info = (
                         f"Énergie : {n.get('energy-kcal_100g', 0)} kcal\n"
                         f"Sucres : {n.get('sugars_100g', 0)} g\n"
                         f"Sel : {n.get('salt_100g', 0)} g\n"
                         f"Protéines : {n.get('proteins_100g', 0)} g"
                     )
-                    
                     self.save_to_backend(code)
         except Exception as e:
-            print(f"Erreur lors de la récupération : {e}")
             self.product_name = "Erreur de connexion"
 
     def save_to_backend(self, code):
@@ -473,51 +478,30 @@ class PandooApp(App):
         try:
             url_off = f"https://world.openfoodfacts.org/api/v0/product/{code}.json"
             res_off = requests.get(url_off, headers=headers, timeout=5)
-            
             if res_off.status_code == 200:
                 data = res_off.json()
                 if data.get("status") == 1:
                     p = data["product"]
                     n = p.get("nutriments", {})
-
-                    # --- NETTOYAGE RADICAL DU TYPE ---
-                    # On essaie plusieurs clés par sécurité
                     raw_type = p.get("categories_old") or p.get("categories") or "Aliment"
-                    
-                    # Si c'est une liste, on prend le premier élément
-                    if isinstance(raw_type, list):
-                        type_produit = raw_type[0]
-                    else:
-                        # Si c'est une string, on découpe par la virgule ET on nettoie
-                        type_produit = str(raw_type).split(',')[0].strip()
+                    type_produit = str(raw_type).split(',')[0].strip()
 
                     payload = {
                         "barcode": str(code),
                         "name": p.get("product_name", "Inconnu"),
                         "brand": p.get("brands", "Inconnu").split(',')[0],
-                        "type": type_produit, # Ici, on n'aura que le premier
+                        "type": type_produit,
                         "calories": float(n.get("energy-kcal_100g", 0)),
                         "glucides": float(n.get("carbohydrates_100g", 0)),
-                        "sugars": float(n.get("sugars_100g", 0)),
                         "proteins": float(n.get("proteins_100g", 0)),
                         "lipids": float(n.get("fat_100g", 0)),
                         "salt": float(n.get("salt_100g", 0)),
                         "calcium": float(n.get("calcium_100g", 0)),
-                        "id_parent": self.user_id 
+                        "id_child": 1 # A adapter selon tes tests
                     }
-
-                    # Envoi à ton API (127.0.0.1:8000 d'après ta capture)
-                    id_enfant = 1 
-                    full_url = f"{BACKEND_URL}/products/?id_child={id_enfant}"
-
-                    response = requests.post(full_url, json=payload, timeout=5)
-                    
-                    if response.status_code in [200, 201]:
-                        print(f"✅ Type enregistré : {type_produit}")
-                    else:
-                        print(f"❌ Erreur API : {response.text}")
-        except Exception as e:
-            print(f"❌ Erreur : {e}")
+                    full_url = f"{BACKEND_URL}/products/?id_child=1"
+                    requests.post(full_url, json=payload, timeout=5)
+        except: pass
 
     def build(self): return WindowManager()
 
