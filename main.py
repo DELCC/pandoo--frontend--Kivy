@@ -21,7 +21,7 @@ from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.boxlayout import BoxLayout
 
 # --- CONFIGURATION RÉSEAU ---
-URL_IMAGE = "http://192.168.1.157:8080/shot.jpg" 
+URL_IMAGE = "http://10.0.7.196:8080/shot.jpg" 
 BACKEND_URL = "http://127.0.0.1:8000"
 
 Builder.load_string('''
@@ -204,14 +204,14 @@ Builder.load_string('''
                     on_release: root.manager.current = "start"
             BoxLayout:
                 orientation: 'vertical'
-                padding: [10, 60, 10, 80]
-                spacing: 20
+                padding: [10, 40, 10, 40]
+                spacing: 15
                 Label:
                     text: "CONNEXION"
                     font_size: '36sp'
                     bold: True
                     size_hint_y: None
-                    height: '100dp'
+                    height: '80dp'
                 BaseInput:
                     id: login_user
                     hint_text: "Utilisateur"
@@ -249,6 +249,22 @@ Builder.load_string('''
                     size_hint_y: None
                     height: '60dp'
                     on_release: root.login_user()
+                
+                Button:
+                    text: "SE CONNECTER AVEC GOOGLE"
+                    size_hint_y: None
+                    height: '50dp'
+                    bold: True
+                    background_color: (0, 0, 0, 0)
+                    canvas.before:
+                        Color:
+                            rgba: (0.9, 0.9, 0.9, 1) if self.state == 'normal' else (0.8, 0.8, 0.8, 1)
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [25,]
+                    color: (0.2, 0.2, 0.2, 1)
+                    on_release: root.login_with_google()
 
 <AddChildScreen>:
     name: "add_child"
@@ -389,23 +405,18 @@ class CreateUserScreen(Screen):
     def login_with_google(self):
         import webbrowser
         webbrowser.open(f"{BACKEND_URL}/auth/login")
-        # Lancer le polling pour vérifier la création du compte Google (toutes les 2 sec)
         self.check_event = Clock.schedule_interval(self.check_auth_status, 2)
 
     def check_auth_status(self, dt):
         try:
-            # On vérifie si l'utilisateur avec ton email Google existe maintenant
             email_to_check = "amaury.jacobe1@gmail.com"
             res = requests.get(f"{BACKEND_URL}/users/by-email/{email_to_check}", timeout=2)
-            
             if res.status_code == 200:
                 user_data = res.json()
                 App.get_running_app().user_id = user_data["id"]
-                # On arrête le polling et on change d'écran
                 Clock.unschedule(self.check_event)
                 self.manager.current = "add_child"
-        except:
-            pass
+        except: pass
 
 class AddChildScreen(Screen):
     def create_child(self):
@@ -414,7 +425,6 @@ class AddChildScreen(Screen):
         parent_id = App.get_running_app().user_id
         try:
             payload = {"name": name, "age": int(age), "id_parent": parent_id}
-            # Utilisation de ton routeur mis à jour
             res = requests.post(f"{BACKEND_URL}/children/", json=payload, timeout=5)
             if res.status_code in [200, 201]: 
                 self.manager.current = "login"
@@ -423,6 +433,22 @@ class AddChildScreen(Screen):
 class LoginScreen(Screen):
     def login_user(self):
         if self.ids.login_user.ids.ti.text: self.manager.current = "scan"
+
+    def login_with_google(self):
+        import webbrowser
+        webbrowser.open(f"{BACKEND_URL}/auth/login")
+        self.check_event = Clock.schedule_interval(self.check_login_status, 2)
+
+    def check_login_status(self, dt):
+        try:
+            email_to_check = "amaury.jacobe1@gmail.com"
+            res = requests.get(f"{BACKEND_URL}/users/by-email/{email_to_check}", timeout=2)
+            if res.status_code == 200:
+                user_data = res.json()
+                App.get_running_app().user_id = user_data["id"]
+                Clock.unschedule(self.check_event)
+                self.manager.current = "scan"
+        except: pass
 
 class ScanScreen(Screen):
     def on_enter(self): self.update_event = Clock.schedule_interval(self.update, 1.0 / 30.0)
@@ -497,7 +523,7 @@ class PandooApp(App):
                         "lipids": float(n.get("fat_100g", 0)),
                         "salt": float(n.get("salt_100g", 0)),
                         "calcium": float(n.get("calcium_100g", 0)),
-                        "id_child": 1 # A adapter selon tes tests
+                        "id_child": 1
                     }
                     full_url = f"{BACKEND_URL}/products/?id_child=1"
                     requests.post(full_url, json=payload, timeout=5)
