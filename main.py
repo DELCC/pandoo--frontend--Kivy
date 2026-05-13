@@ -319,17 +319,17 @@ Builder.load_string('''
         BoxLayout:
             orientation: 'vertical'
             padding: [30, 40]
-            spacing: 20
+            spacing: 15
             Label:
-                text: "SCAN RÉUSSI !"
-                font_size: '32sp'
+                text: "LE VERDICT DE PANDOO"
+                font_size: '28sp'
                 bold: True
                 size_hint_y: None
-                height: '60dp'
+                height: '50dp'
             BoxLayout:
                 orientation: 'vertical'
-                padding: [25, 30]
-                spacing: 12
+                padding: [25, 20]
+                spacing: 10
                 canvas.before:
                     Color:
                         rgba: (1, 1, 1, 1)
@@ -344,36 +344,49 @@ Builder.load_string('''
                     color: (0.1, 0.1, 0.1, 1)
                     halign: 'center'
                     size_hint_y: None
-                    height: '60dp'
+                    height: '50dp'
                     text_size: self.width, None
+                
+                # --- ZONE CONSEILS PANDOO ---
+                Label:
+                    text: app.pandoo_advice
+                    font_size: '15sp'
+                    italic: True
+                    color: (0.15, 0.7, 0.5, 1)
+                    halign: 'center'
+                    size_hint_y: None
+                    height: '80dp'
+                    text_size: self.width, None
+                
                 Widget:
                     size_hint_y: None
                     height: '2dp'
                     canvas:
                         Color:
-                            rgba: (0.15, 0.75, 0.5, 0.5)
+                            rgba: (0.15, 0.75, 0.5, 0.3)
                         Rectangle:
                             pos: self.x + 30, self.y
                             size: self.width - 60, self.height
+                
                 Label:
                     text: "[i]Valeurs pour 100g :[/i]"
                     markup: True
-                    font_size: '16sp'
+                    font_size: '14sp'
                     color: (0.4, 0.4, 0.4, 1)
                     size_hint_y: None
-                    height: '30dp'
+                    height: '25dp'
                     halign: 'left'
                     text_size: self.width, None
                 Label:
                     text: app.nutrition_info
-                    font_size: '18sp'
+                    font_size: '16sp'
                     color: (0.2, 0.2, 0.2, 1)
                     halign: 'left'
                     valign: 'top'
                     text_size: self.width, None
-                    line_height: 1.3
+                    line_height: 1.2
             Widget:
-                size_hint_y: 0.1
+                size_hint_y: 0.05
             RoundedButton:
                 text: "RESCANNER"
                 size_hint_y: None
@@ -463,7 +476,9 @@ class ScanScreen(Screen):
                     code = barcode.data.decode('utf-8')
                     if code.isdigit():
                         Clock.unschedule(self.update_event)
-                        App.get_running_app().fetch_details(code)
+                        # On appelle directement save_to_backend qui va maintenant
+                        # déclencher l'analyse et récupérer les conseils
+                        App.get_running_app().save_to_backend(code)
                         self.manager.current = "details"
                 buf = cv2.flip(frame, 0).tobytes()
                 texture = Texture.create(size=(frame.shape[1], frame.shape[0]), colorfmt='bgr')
@@ -474,49 +489,39 @@ class ScanScreen(Screen):
 class PandooApp(App):
     product_name = StringProperty("Chargement...")
     nutrition_info = StringProperty("")
+    pandoo_advice = StringProperty("Analyse en cours...")
     status_text = StringProperty("Scannez un produit")
     user_id = 1
 
-    def fetch_details(self, code):
+    def save_to_backend(self, code):
         headers = {'User-Agent': 'PandooApp - Python/Kivy'}
         try:
-            url = f"https://world.openfoodfacts.org/api/v0/product/{code}.json"
-            res = requests.get(url, headers=headers, timeout=5)
-            if res.status_code == 200:
-                data = res.json()
-                if data.get("status") == 1:
-                    p = data["product"]
-                    brand = p.get("brands", "Inconnu").split(',')[0]
-                    self.product_name = f"{p.get('product_name', 'Produit')}\n({brand})"
+            # 1. On récupère d'abord les infos de Open Food Facts
+            url_off = f"https://world.openfoodfacts.org/api/v0/product/{code}.json"
+            res_off = requests.get(url_off, headers=headers, timeout=5)
+            
+            if res_off.status_code == 200:
+                data_off = res_off.json()
+                if data_off.get("status") == 1:
+                    p = data_off["product"]
                     n = p.get("nutriments", {})
+                    brand = p.get("brands", "Inconnu").split(',')[0]
+                    
+                    # Mise à jour temporaire de l'affichage
+                    self.product_name = f"{p.get('product_name', 'Produit')}\n({brand})"
                     self.nutrition_info = (
                         f"Énergie : {n.get('energy-kcal_100g', 0)} kcal\n"
                         f"Sucres : {n.get('sugars_100g', 0)} g\n"
                         f"Sel : {n.get('salt_100g', 0)} g\n"
                         f"Protéines : {n.get('proteins_100g', 0)} g"
                     )
-                    self.save_to_backend(code)
-        except Exception as e:
-            self.product_name = "Erreur de connexion"
 
-    def save_to_backend(self, code):
-        headers = {'User-Agent': 'PandooApp - Python/Kivy'}
-        try:
-            url_off = f"https://world.openfoodfacts.org/api/v0/product/{code}.json"
-            res_off = requests.get(url_off, headers=headers, timeout=5)
-            if res_off.status_code == 200:
-                data = res_off.json()
-                if data.get("status") == 1:
-                    p = data["product"]
-                    n = p.get("nutriments", {})
-                    raw_type = p.get("categories_old") or p.get("categories") or "Aliment"
-                    type_produit = str(raw_type).split(',')[0].strip()
-
+                    # 2. On envoie au Backend pour enregistrement et ANALYSE
                     payload = {
                         "barcode": str(code),
                         "name": p.get("product_name", "Inconnu"),
-                        "brand": p.get("brands", "Inconnu").split(',')[0],
-                        "type": type_produit,
+                        "brand": brand,
+                        "type": str(p.get("categories", "Aliment")).split(',')[0],
                         "calories": float(n.get("energy-kcal_100g", 0)),
                         "glucides": float(n.get("carbohydrates_100g", 0)),
                         "proteins": float(n.get("proteins_100g", 0)),
@@ -525,9 +530,23 @@ class PandooApp(App):
                         "calcium": float(n.get("calcium_100g", 0)),
                         "id_child": 1
                     }
-                    full_url = f"{BACKEND_URL}/products/?id_child=1"
-                    requests.post(full_url, json=payload, timeout=5)
-        except: pass
+                    
+                    res_back = requests.post(f"{BACKEND_URL}/products/?id_child=1", json=payload, timeout=5)
+                    
+                    if res_back.status_code == 200:
+                        data_back = res_back.json()
+                        analysis = data_back.get("analysis", {})
+                        
+                        # On combine les tips et les alertes
+                        all_messages = analysis.get("tips", []) + analysis.get("alerts", [])
+                        if all_messages:
+                            self.pandoo_advice = "\n".join(all_messages)
+                        else:
+                            self.pandoo_advice = "Ce produit semble équilibré pour ton âge ! ✨"
+                            
+        except Exception as e:
+            self.product_name = "Erreur"
+            self.pandoo_advice = f"Connexion au serveur impossible"
 
     def build(self): return WindowManager()
 
