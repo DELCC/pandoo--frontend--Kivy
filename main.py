@@ -355,70 +355,95 @@ Builder.load_string('''
 <DetailsScreen>:
     name: "details"
     RelativeLayout:
-        BackgroundLayer:
-        BoxLayout:
-            orientation: 'vertical'
-            padding: [30, 30]
-            spacing: 12
-            Label:
-                text: "LE VERDICT DE PANDOO"
-                font_size: '28sp'
-                bold: True
+        BackgroundLayer: # L'image avec le panda reste en fond
+
+        # Conteneur principal pour le titre et le rectangle blanc
+        AnchorLayout:
+            anchor_x: 'center'
+            anchor_y: 'top'
+            padding: [25, 40, 25, 0] # 40dp de marge en haut pour le titre
+
             BoxLayout:
                 orientation: 'vertical'
-                padding: [25, 15]
-                spacing: 8
-                canvas.before:
-                    Color:
-                        rgba: (1, 1, 1, 1)
-                    RoundedRectangle:
-                        pos: self.pos
-                        size: self.size
-                        radius: [20]
+                size_hint: (1, None)
+                height: self.minimum_height
+                spacing: 20 # Espace entre le titre et le rectangle
+
+                # --- LE TITRE ---
                 Label:
-                    text: app.product_name
-                    font_size: '20sp'
+                    text: "LE VERDICT DE PANDOO"
+                    font_size: '26sp'
                     bold: True
-                    color: (0.1, 0.1, 0.1, 1)
-                    halign: 'center'
+                    color: (1, 1, 1, 1)
                     size_hint_y: None
-                    height: '50dp'
-                    text_size: self.width, None
-                Label:
-                    text: app.pandoo_advice
-                    markup: True
-                    font_size: '15sp'
-                    italic: True
-                    color: (0.15, 0.7, 0.5, 1)
-                    halign: 'center'
-                    size_hint_y: None
-                    height: '80dp'
-                    text_size: self.width, None
-                Widget:
-                    size_hint_y: None
-                    height: '2dp'
-                    canvas:
+                    height: '40dp'
+
+                # --- LE RECTANGLE BLANC (REMONTÉ) ---
+                BoxLayout:
+                    orientation: 'vertical'
+                    size_hint: (1, None)
+                    height: self.minimum_height
+                    padding: [15, 20]
+                    spacing: 10
+                    canvas.before:
                         Color:
-                            rgba: (0.15, 0.75, 0.5, 0.3)
-                        Rectangle:
-                            pos: self.x + 30, self.y
-                            size: self.width - 60, self.height
-                Label:
-                    text: app.nutrition_info
-                    markup: True
-                    font_size: '16sp'
-                    color: (0.2, 0.2, 0.2, 1)
-                    halign: 'left'
-                    text_size: self.width, None
+                            rgba: (1, 1, 1, 1)
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [20]
+
+                    Label:
+                        text: app.product_name
+                        font_size: '18sp'
+                        bold: True
+                        color: (0.1, 0.1, 0.1, 1)
+                        size_hint_y: None
+                        height: self.texture_size[1]
+                        text_size: self.width, None
+                        halign: 'center'
+
+                    Label:
+                        text: app.pandoo_advice
+                        markup: True
+                        font_size: '15sp'
+                        size_hint_y: None
+                        height: self.texture_size[1]
+                        text_size: self.width, None
+                        halign: 'center'
+
+                    Widget: # Petit trait décoratif
+                        size_hint_y: None
+                        height: '1dp'
+                        canvas:
+                            Color:
+                                rgba: (0.15, 0.75, 0.5, 0.2)
+                            Rectangle:
+                                pos: self.x + 20, self.y
+                                size: self.width - 40, self.height
+
+                    Label:
+                        text: app.nutrition_info
+                        markup: True
+                        font_size: '14sp'
+                        color: (0.2, 0.2, 0.2, 1)
+                        size_hint_y: None
+                        height: self.texture_size[1]
+                        text_size: self.width, None
+                        halign: 'left'
+
+        # --- LES BOUTONS VERTS (NE TOUCHENT PAS AU PANDA) ---
+        BoxLayout:
+            orientation: 'vertical'
+            size_hint: (0.85, None)
+            height: '110dp'
+            pos_hint: {'center_x': 0.5, 'y': 0.05} # Calés en bas
+            spacing: 12
             RoundedButton:
                 text: "VOIR SUR GOOGLE"
-                size_hint_y: None
-                height: '50dp'
                 on_release: app.open_google_search()
             RoundedButton:
                 text: "RESCANNER"
-                size_hint_y: None
-                height: '50dp'
                 on_release: root.manager.current = "scan"
 ''')
 
@@ -592,70 +617,53 @@ class PandooApp(App):
                 if data_off.get("status") == 1:
                     p = data_off["product"]
                     n = p.get("nutriments", {})
-                    
                     self.product_name = p.get('product_name', 'Produit inconnu')
                     
-                    # --- VALEURS NUTRITIVES COLORÉES ---
-                    kcal = n.get('energy-kcal_100g', 0)
-                    sucres = n.get('sugars_100g', 0)
-                    sel = n.get('salt_100g', 0)
+                    # --- EXTRACTION & ARRONDI 2 CHIFFRES ---
+                    val_kcal = int(n.get('energy-kcal_100g', 0))
+                    val_sucre = round(float(n.get('sugars_100g', 0)), 2)
+                    val_sel = round(float(n.get('salt_100g', 0)), 2)
+                    val_lip = round(float(n.get('fat_100g', 0)), 2)
+                    val_glu = round(float(n.get('carbohydrates_100g', 0)), 2)
+                    val_fib = round(float(n.get('fiber_100g', 0)), 2)
+                    val_prot = round(float(n.get('proteins_100g', 0)), 2)
+                    val_calc = round(float(n.get('calcium_100g', 0)), 2)
 
-                    # Seuils de couleur
-                    color_kcal = "ff3333" if kcal > 400 else "22cc22"
-                    color_sucres = "ff3333" if sucres > 15 else "22cc22"
-                    color_sel = "ff3333" if sel > 1.5 else "22cc22"
+                    # --- COULEURS ---
+                    def get_c(v, s_e, s_o):
+                        if v <= s_e: return "22cc22"
+                        if v <= s_o: return "ff9900"
+                        return "ff3333"
 
-                    self.nutrition_info = (
-                        f"Énergie : [color={color_kcal}]{kcal} kcal[/color]\n"
-                        f"Sucres : [color={color_sucres}]{sucres}g[/color]\n"
-                        f"Sel : [color={color_sel}]{sel}g[/color]"
-                    )
-                    
-                    # Préparation du payload complet pour satisfaire le backend
-                    payload = {
-                        "barcode": str(code),
-                        "name": str(self.product_name),
-                        "brand": str(p.get('brands', 'Inconnue')),
-                        "type": str(p.get('categories', 'Aliment')),
-                        "calories": float(kcal),
-                        "glucides": float(n.get('carbohydrates_100g', 0)),
-                        "calcium": float(n.get('calcium_100g', 0)),
-                        "proteins": float(n.get('proteins_100g', 0)),
-                        "lipids": float(n.get('fat_100g', 0)),
-                        "salt": float(sel),
-                        "id_child": int(self.active_child_id)
-                    }
-                    
-                    # Envoi au backend
-                    res_back = requests.post(
-                        f"{BACKEND_URL}/products/?id_child={self.active_child_id}", 
-                        json=payload, 
-                        timeout=5
-                    )
-                    
-                    if res_back.status_code == 200:
-                        analysis = res_back.json().get("analysis", {})
-                        tips = analysis.get("tips", [])
-                        
-                        if tips:
-                            formatted_tips = ""
-                            for tip in tips:
-                                # Coloration des conseils
-                                if any(word in tip.lower() for word in ["trop", "attention", "mauvais", "éviter", "limiter"]):
-                                    formatted_tips += f"[color=ff3333]• {tip}[/color]\n"
-                                elif any(word in tip.lower() for word in ["bien", "excellent", "bon", "parfait"]):
-                                    formatted_tips += f"[color=22cc22]• {tip}[/color]\n"
-                                else:
-                                    formatted_tips += f"• {tip}\n"
-                            self.pandoo_advice = formatted_tips
-                        else:
-                            self.pandoo_advice = "Analyse terminée !"
+                    c_suc = get_c(val_sucre, 5.0, 13.5)
+                    c_sel = get_c(val_sel, 0.3, 0.9)
+                    c_lip = get_c(val_lip, 20.0, 35.0)
+
+                    # --- CONSEIL PANDO0 ---
+                    if val_sucre > 15.0:
+                        advice = "[color=ff3333]• Le sucre fatigue ton corps, choisis plutôt un fruit ![/color]"
+                    elif val_calc > 0.12:
+                        advice = "[color=22cc22]• Indispensable pour grandir et renforcer tes os.[/color]"
                     else:
-                        print(f"Erreur Backend {res_back.status_code}: {res_back.text}")
-                        self.pandoo_advice = "[color=ff9900]Erreur de validation backend.[/color]"
-        except Exception as e:
-            print(f"Erreur globale : {e}")
-            self.pandoo_advice = "Problème de connexion."
+                        advice = "[color=22cc22]Ce produit semble équilibré pour petit Pandoo ![/color]"
+                    
+                    self.pandoo_advice = advice
+
+                    # --- AFFICHAGE NUTRITIONNEL ---
+                    # Ajout des Protéines et Glucides en entier
+                    self.nutrition_info = (
+                        f"[b]Valeurs pour 100g :[/b]\n"
+                        f"Énergie : {val_kcal} kcal\n"
+                        f"Sucres : [color={c_suc}]{val_sucre:.2f}g[/color]  |  Sel : [color={c_sel}]{val_sel:.2f}g[/color]\n"
+                        f"Lipides : [color={c_lip}]{val_lip:.2f}g[/color]  |  Protéines : {val_prot:.2f}g\n"
+                        f"Glucides : {val_glu:.2f}g  |  Fibres : {val_fib:.2f}g"
+                    )
+                    
+                    # Appel backend simplifié
+                    requests.post(f"{BACKEND_URL}/products/?id_child={self.active_child_id}", 
+                                  json={"barcode": str(code), "id_child": int(self.active_child_id)}, timeout=5)
+        except Exception:
+            self.pandoo_advice = "Erreur de connexion."
 
     def build(self): return WindowManager()
 
