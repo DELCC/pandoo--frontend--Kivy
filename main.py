@@ -4,6 +4,7 @@ import numpy as np
 import requests
 import json
 import webbrowser
+import re  # Ajout pour la validation du mot de passe
 from kivy.config import Config
 
 # --- CONFIGURATION DE LA FENÊTRE ---
@@ -150,7 +151,7 @@ Builder.load_string('''
                     on_release: root.manager.current = "start"
             BoxLayout:
                 orientation: 'vertical'
-                padding: [10, 20, 10, 0]
+                padding: [10, 15, 10, 0]
                 spacing: 12
                 Label:
                     text: "INSCRIPTION"
@@ -164,10 +165,58 @@ Builder.load_string('''
                 BaseInput:
                     id: new_email
                     hint_text: "Email"
-                BaseInput:
-                    id: new_pass
-                    hint_text: "Mot de passe"
-                    is_password: True
+                BoxLayout:
+                    size_hint_y: None
+                    height: '55dp'
+                    canvas.before:
+                        Color:
+                            rgba: (1, 1, 1, 0.95)
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [15,]
+                    TextInput:
+                        id: new_pass
+                        hint_text: "Mot de passe"
+                        password: True
+                        background_normal: ''
+                        background_active: ''
+                        background_color: (0,0,0,0)
+                        foreground_color: (0.1, 0.1, 0.1, 1)
+                        hint_text_color: (0.5, 0.5, 0.5, 1)
+                        padding: [20, 18, 15, 15]
+                        font_size: '16sp'
+                        multiline: False
+                    EyeButton:
+                        on_release: new_pass.password = not new_pass.password
+                        Image:
+                            source: 'eye_off.png' if new_pass.password else 'eye_on.png'
+                            size_hint: None, None
+                            size: '22dp', '22dp'
+                            opacity: 0.6
+                
+                # Rectangle d'erreur arrondi
+                BoxLayout:
+                    size_hint_y: None
+                    height: '65dp' if root.error_msg else '0dp'
+                    opacity: 1 if root.error_msg else 0
+                    padding: [15, 5]
+                    canvas.before:
+                        Color:
+                            rgba: (1, 1, 1, 0.95)
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [15,]
+                    Label:
+                        text: root.error_msg
+                        color: (0.9, 0.2, 0.2, 1)
+                        font_size: '12sp'
+                        bold: True
+                        halign: 'center'
+                        valign: 'middle'
+                        text_size: self.width - 30, None
+
                 RoundedButton:
                     text: "VALIDER"
                     size_hint_y: None
@@ -458,48 +507,96 @@ class DetailsScreen(Screen): pass
 class WindowManager(ScreenManager): pass
 
 class CreateUserScreen(Screen):
+    error_msg = StringProperty("")
+
     def validate_and_create(self):
-        username = self.ids.new_user.ids.ti.text
-        email = self.ids.new_email.ids.ti.text
-        password = self.ids.new_pass.ids.ti.text
-        if not username or not email or not password: return
+        username = self.ids.new_user.ids.ti.text.strip()
+        email = self.ids.new_email.ids.ti.text.strip()
+        password = self.ids.new_pass.text 
+        
+        if not username or not email or not password:
+            self.error_msg = "Tous les champs sont obligatoires."
+            return
+
+        password_pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{10,}$"
+        if not re.match(password_pattern, password):
+            self.error_msg = "Le mot de passe doit contenir :\n10 caractères, 1 majuscule, 1 minuscule et 1 chiffre."
+            return
+
+        self.error_msg = ""
+        # Le backend attend désormais 'username' explicitement
         payload = {"name": username, "username": username, "email": email, "password": password}
+        
         try:
             res = requests.post(f"{BACKEND_URL}/users/", json=payload, timeout=5)
-            if res.status_code in [200, 201]:
+            
+            # Gestion du doublon
+            if res.status_code == 400:
+                self.suggest_new_username(username)
+            elif res.status_code in [200, 201]:
                 user_data = res.json()
-                new_id = user_data.get("id") or user_data.get("user_id", 0)
+                # On s'adapte à la structure de réponse du backend
+                new_id = user_data.get("user", {}).get("id") or user_data.get("id")
                 App.get_running_app().user_id = new_id
-                self.manager.current = "start"
-        except Exception as e: print(f"Erreur d'inscription: {e}")
+                self.manager.current = "child_list" # Directement vers la liste après création
+            else:
+                self.error_msg = f"Erreur ({res.status_code})"
+        except Exception as e: 
+            self.error_msg = "Serveur injoignable."
 
-    def login_with_google(self):
-        webbrowser.open(f"{BACKEND_URL}/auth/login")
-        self.check_event = Clock.schedule_interval(self.check_auth_status, 2)
-
-    def check_auth_status(self, dt):
-        try:
-            email_to_check = "amaury.jacobe1@gmail.com"
-            res = requests.get(f"{BACKEND_URL}/users/by-email/{email_to_check}", timeout=2)
-            if res.status_code == 200:
-                user_data = res.json()
-                new_id = user_data.get("id") or user_data.get("user_id", 0)
-                App.get_running_app().user_id = new_id
-                Clock.unschedule(self.check_event)
-                self.manager.current = "start"
-        except: pass
+    def suggest_new_username(self, base_name):
+        """
+        Analyse le nom pour incrémenter intelligemment.
+        Ex: amo -> amo1, amo1 -> amo2, etc.
+        """
+        # On cherche si le nom finit déjà par des chiffres
+        match = re.search(r"^(.*?)(\d+)$", base_name)
+        
+        if match:
+            # Si on a "amo1", prefix="amo" et counter=2
+            prefix = match.group(1)
+            counter = int(match.group(2)) + 1
+        else:
+            # Si on a "amo", prefix="amo" et counter=1
+            prefix = base_name
+            counter = 1
+            
+        found = False
+        new_suggestion = base_name
+        
+        # Teste les noms sur le serveur (ex: amo1, amo2...)
+        while not found and counter < 100:
+            temp_name = f"{prefix}{counter}"
+            try:
+                check = requests.get(f"{BACKEND_URL}/users/by-username/{temp_name}", timeout=2)
+                if check.status_code == 404: 
+                    new_suggestion = temp_name
+                    found = True
+                else:
+                    counter += 1
+            except:
+                break
+        
+        if found:
+            self.error_msg = f"Nom déjà pris. Essayez : {new_suggestion}"
+            self.ids.new_user.ids.ti.text = new_suggestion
+        else:
+            self.error_msg = "Ce nom d'utilisateur est indisponible."
 
 class LoginScreen(Screen):
     def login_user(self):
-        username = self.ids.login_user.ids.ti.text
+        username = self.ids.login_user.ids.ti.text.strip()
         if username:
             try:
                 res = requests.get(f"{BACKEND_URL}/users/by-username/{username}", timeout=2)
                 if res.status_code == 200:
                     user_data = res.json()
-                    new_id = user_data.get("id") or user_data.get("user_id", 0)
+                    new_id = user_data.get("id")
                     App.get_running_app().user_id = new_id
                     self.manager.current = "child_list"
+                else:
+                    # Ici on pourrait ajouter un error_msg pour le login aussi
+                    print("Utilisateur non trouvé")
             except Exception as e: print(f"Erreur de connexion : {e}")
 
     def login_with_google(self):
@@ -512,7 +609,7 @@ class LoginScreen(Screen):
             res = requests.get(f"{BACKEND_URL}/users/by-email/{email_to_check}", timeout=2)
             if res.status_code == 200:
                 user_data = res.json()
-                new_id = user_data.get("id") or user_data.get("user_id", 0)
+                new_id = user_data.get("id")
                 App.get_running_app().user_id = new_id
                 Clock.unschedule(self.check_event)
                 self.manager.current = "child_list"
@@ -643,7 +740,6 @@ class PandooApp(App):
                         f"[color=e67e22]Glucides : {val_glu:.2f}g[/color]  |  [color=9b59b6]Fibres : {val_fib:.2f}g[/color]"
                     )
                     
-                    # --- PRÉPARATION DU PAYLOAD POUR LE BACKEND ---
                     product_data = {
                         "barcode": str(code),
                         "name": self.product_name,
@@ -659,13 +755,11 @@ class PandooApp(App):
                         "calcium": val_calcium
                     }
                     
-                    # --- ENVOI AU BACKEND (id_child passé en query param) ---
                     res_backend = requests.post(
                         f"{BACKEND_URL}/products/?id_child={self.active_child_id}", 
                         json=product_data, 
                         timeout=5
                     )
-                    print(f"DEBUG BACKEND: Status {res_backend.status_code} - Reponse: {res_backend.text}")
 
         except Exception as e:
             print(f"Erreur API : {e}")
