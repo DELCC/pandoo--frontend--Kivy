@@ -76,7 +76,7 @@ Builder.load_string('''
     bold: True
     canvas.before:
         Color:
-            rgba: (0.15, 0.75, 0.5, 1) if self.state == 'normal' else (0.1, 0.6, 0.4, 1)
+            rgba: (0.15, 0.75, 0.5, 0.9) if self.state == 'normal' else (0.1, 0.6, 0.4, 1)
         RoundedRectangle:
             pos: self.pos
             size: self.size
@@ -332,44 +332,57 @@ Builder.load_string('''
 
 <ScanScreen>:
     name: "scan"
-    BoxLayout:
-        orientation: 'vertical'
-        RelativeLayout:
-            size_hint_y: 0.8
-            Image:
-                id: camera_preview
-            Widget:
-                canvas.after:
-                    Color:
-                        rgba: (0.15, 0.75, 0.5, 0.5)
-                    Line:
-                        width: 3
-                        rounded_rectangle: (self.width*0.15, self.height*0.3, self.width*0.7, self.height*0.4, 20)
+    RelativeLayout:
+        Image:
+            id: camera_preview
+            size_hint: (1, 1)
+            pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+        Widget:
+            canvas.after:
+                Color:
+                    rgba: (0.15, 0.75, 0.5, 0.5)
+                Line:
+                    width: 3
+                    rounded_rectangle: (self.width*0.15, self.height*0.3, self.width*0.7, self.height*0.4, 20)
         Label:
             text: app.status_text
-            size_hint_y: 0.2
+            size_hint: (1, 0.2)
+            pos_hint: {'center_x': 0.5, 'y': 0}
             color: (0.15, 0.75, 0.5, 1)
             bold: True
             font_size: '18sp'
+        AnchorLayout:
+            anchor_x: 'left'
+            anchor_y: 'top'
+            padding: [20, 20]
+            Button:
+                text: "< Dernier Scan"
+                size_hint: None, None
+                size: '130dp', '45dp'
+                background_color: (0,0,0,0)
+                bold: True
+                on_release: if app.product_name != "Chargement...": root.manager.current = "details"
+                canvas.before:
+                    Color:
+                        rgba: (0.15, 0.75, 0.5, 0.7)
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [15,]
 
 <DetailsScreen>:
     name: "details"
     RelativeLayout:
-        BackgroundLayer: # L'image avec le panda reste en fond
-
-        # Conteneur principal pour le titre et le rectangle blanc
+        BackgroundLayer:
         AnchorLayout:
             anchor_x: 'center'
             anchor_y: 'top'
-            padding: [25, 40, 25, 0] # 40dp de marge en haut pour le titre
-
+            padding: [25, 40, 25, 0]
             BoxLayout:
                 orientation: 'vertical'
                 size_hint: (1, None)
                 height: self.minimum_height
-                spacing: 20 # Espace entre le titre et le rectangle
-
-                # --- LE TITRE ---
+                spacing: 20
                 Label:
                     text: "LE VERDICT DE PANDOO"
                     font_size: '26sp'
@@ -377,8 +390,6 @@ Builder.load_string('''
                     color: (1, 1, 1, 1)
                     size_hint_y: None
                     height: '40dp'
-
-                # --- LE RECTANGLE BLANC (REMONTÉ) ---
                 BoxLayout:
                     orientation: 'vertical'
                     size_hint: (1, None)
@@ -392,7 +403,6 @@ Builder.load_string('''
                             pos: self.pos
                             size: self.size
                             radius: [20]
-
                     Label:
                         text: app.product_name
                         font_size: '18sp'
@@ -402,7 +412,6 @@ Builder.load_string('''
                         height: self.texture_size[1]
                         text_size: self.width, None
                         halign: 'center'
-
                     Label:
                         text: app.pandoo_advice
                         markup: True
@@ -411,8 +420,7 @@ Builder.load_string('''
                         height: self.texture_size[1]
                         text_size: self.width, None
                         halign: 'center'
-
-                    Widget: # Petit trait décoratif
+                    Widget:
                         size_hint_y: None
                         height: '1dp'
                         canvas:
@@ -421,7 +429,6 @@ Builder.load_string('''
                             Rectangle:
                                 pos: self.x + 20, self.y
                                 size: self.width - 40, self.height
-
                     Label:
                         text: app.nutrition_info
                         markup: True
@@ -431,19 +438,17 @@ Builder.load_string('''
                         height: self.texture_size[1]
                         text_size: self.width, None
                         halign: 'left'
-
-        # --- LES BOUTONS VERTS (NE TOUCHENT PAS AU PANDA) ---
         BoxLayout:
             orientation: 'vertical'
             size_hint: (0.85, None)
             height: '110dp'
-            pos_hint: {'center_x': 0.5, 'y': 0.05} # Calés en bas
+            pos_hint: {'center_x': 0.5, 'y': 0.05}
             spacing: 12
             RoundedButton:
                 text: "VOIR SUR GOOGLE"
                 on_release: app.open_google_search()
             RoundedButton:
-                text: "RESCANNER"
+                text: "RETOUR AU SCANNER"
                 on_release: root.manager.current = "scan"
 ''')
 
@@ -465,10 +470,8 @@ class CreateUserScreen(Screen):
                 user_data = res.json()
                 new_id = user_data.get("id") or user_data.get("user_id", 0)
                 App.get_running_app().user_id = new_id
-                # Retour vers l'accueil pour se connecter
                 self.manager.current = "start"
-        except Exception as e: 
-            print(f"Erreur d'inscription: {e}")
+        except Exception as e: print(f"Erreur d'inscription: {e}")
 
     def login_with_google(self):
         webbrowser.open(f"{BACKEND_URL}/auth/login")
@@ -497,8 +500,7 @@ class LoginScreen(Screen):
                     new_id = user_data.get("id") or user_data.get("user_id", 0)
                     App.get_running_app().user_id = new_id
                     self.manager.current = "child_list"
-            except Exception as e:
-                print(f"Erreur de connexion : {e}")
+            except Exception as e: print(f"Erreur de connexion : {e}")
 
     def login_with_google(self):
         webbrowser.open(f"{BACKEND_URL}/auth/login")
@@ -521,7 +523,6 @@ class AddChildScreen(Screen):
         name = self.ids.child_name.ids.ti.text
         age = self.ids.child_age.ids.ti.text
         parent_id = App.get_running_app().user_id
-        
         if name and age and parent_id != 0:
             try:
                 payload = {"name": name, "age": int(age), "id_parent": parent_id}
@@ -530,19 +531,15 @@ class AddChildScreen(Screen):
                     self.ids.child_name.ids.ti.text = ""
                     self.ids.child_age.ids.ti.text = ""
             except: pass
-
-        if not more:
-            self.manager.current = "child_list"
+        if not more: self.manager.current = "child_list"
 
 class ChildListScreen(Screen):
     def on_enter(self):
         self.ids.container.clear_widgets()
         parent_id = App.get_running_app().user_id
-        
         if parent_id == 0:
             self.manager.current = "start"
             return
-
         try:
             res = requests.get(f"{BACKEND_URL}/children/parent/{parent_id}", timeout=5)
             if res.status_code == 200:
@@ -550,14 +547,7 @@ class ChildListScreen(Screen):
                 from kivy.graphics import Color, RoundedRectangle
                 children = res.json()
                 for child in children:
-                    btn = Button(
-                        text=f"{child['name']} ({child['age']} ans)", 
-                        size_hint_y=None, 
-                        height='55dp',
-                        background_color=(0,0,0,0),
-                        color=(0.1, 0.1, 0.1, 1),
-                        bold=True
-                    )
+                    btn = Button(text=f"{child['name']} ({child['age']} ans)", size_hint_y=None, height='55dp', background_color=(0,0,0,0), color=(0.1, 0.1, 0.1, 1), bold=True)
                     with btn.canvas.before:
                         Color(1, 1, 1, 0.95)
                         btn.rect = RoundedRectangle(pos=btn.pos, size=btn.size, radius=[15,])
@@ -612,14 +602,14 @@ class PandooApp(App):
         try:
             url_off = f"https://world.openfoodfacts.org/api/v0/product/{code}.json"
             res_off = requests.get(url_off, headers=headers, timeout=5)
+            
             if res_off.status_code == 200:
                 data_off = res_off.json()
                 if data_off.get("status") == 1:
                     p = data_off["product"]
                     n = p.get("nutriments", {})
-                    self.product_name = p.get('product_name', 'Produit inconnu')
                     
-                    # --- EXTRACTION & ARRONDI 2 CHIFFRES ---
+                    self.product_name = p.get('product_name', 'Produit inconnu')
                     val_kcal = int(n.get('energy-kcal_100g', 0))
                     val_sucre = round(float(n.get('sugars_100g', 0)), 2)
                     val_sel = round(float(n.get('salt_100g', 0)), 2)
@@ -627,9 +617,8 @@ class PandooApp(App):
                     val_glu = round(float(n.get('carbohydrates_100g', 0)), 2)
                     val_fib = round(float(n.get('fiber_100g', 0)), 2)
                     val_prot = round(float(n.get('proteins_100g', 0)), 2)
-                    val_calc = round(float(n.get('calcium_100g', 0)), 2)
+                    val_calcium = round(float(n.get('calcium_100g', 0)), 3)
 
-                    # --- COULEURS ---
                     def get_c(v, s_e, s_o):
                         if v <= s_e: return "22cc22"
                         if v <= s_o: return "ff9900"
@@ -639,30 +628,47 @@ class PandooApp(App):
                     c_sel = get_c(val_sel, 0.3, 0.9)
                     c_lip = get_c(val_lip, 20.0, 35.0)
 
-                    # --- CONSEIL PANDO0 ---
                     if val_sucre > 15.0:
-                        advice = "[color=ff3333]• Le sucre fatigue ton corps, choisis plutôt un fruit ![/color]"
-                    elif val_calc > 0.12:
-                        advice = "[color=22cc22]• Indispensable pour grandir et renforcer tes os.[/color]"
+                        self.pandoo_advice = "[color=ff3333]• Le sucre fatigue ton corps, choisis plutôt un fruit ![/color]"
+                    elif val_calcium > 0.12:
+                        self.pandoo_advice = "[color=22cc22]• Indispensable pour grandir et renforcer tes os.[/color]"
                     else:
-                        advice = "[color=22cc22]Ce produit semble équilibré pour petit Pandoo ![/color]"
-                    
-                    self.pandoo_advice = advice
+                        self.pandoo_advice = "[color=22cc22]Ce produit semble équilibré pour petit Pandoo ![/color]"
 
-                    # --- AFFICHAGE NUTRITIONNEL ---
-                    # Ajout des Protéines et Glucides en entier
                     self.nutrition_info = (
                         f"[b]Valeurs pour 100g :[/b]\n"
                         f"Énergie : {val_kcal} kcal\n"
                         f"Sucres : [color={c_suc}]{val_sucre:.2f}g[/color]  |  Sel : [color={c_sel}]{val_sel:.2f}g[/color]\n"
-                        f"Lipides : [color={c_lip}]{val_lip:.2f}g[/color]  |  Protéines : {val_prot:.2f}g\n"
-                        f"Glucides : {val_glu:.2f}g  |  Fibres : {val_fib:.2f}g"
+                        f"Lipides : [color={c_lip}]{val_lip:.2f}g[/color]  |  [color=3498db]Protéines : {val_prot:.2f}g[/color]\n"
+                        f"[color=e67e22]Glucides : {val_glu:.2f}g[/color]  |  [color=9b59b6]Fibres : {val_fib:.2f}g[/color]"
                     )
                     
-                    # Appel backend simplifié
-                    requests.post(f"{BACKEND_URL}/products/?id_child={self.active_child_id}", 
-                                  json={"barcode": str(code), "id_child": int(self.active_child_id)}, timeout=5)
-        except Exception:
+                    # --- PRÉPARATION DU PAYLOAD POUR LE BACKEND ---
+                    product_data = {
+                        "barcode": str(code),
+                        "name": self.product_name,
+                        "brand": p.get('brands', 'Marque inconnue'),
+                        "type": p.get('categories', 'Aliment'),
+                        "calories": val_kcal,
+                        "proteins": val_prot,
+                        "glucides": val_glu,
+                        "lipids": val_lip,
+                        "salt": val_sel,
+                        "sugars": val_sucre,
+                        "fibers": val_fib,
+                        "calcium": val_calcium
+                    }
+                    
+                    # --- ENVOI AU BACKEND (id_child passé en query param) ---
+                    res_backend = requests.post(
+                        f"{BACKEND_URL}/products/?id_child={self.active_child_id}", 
+                        json=product_data, 
+                        timeout=5
+                    )
+                    print(f"DEBUG BACKEND: Status {res_backend.status_code} - Reponse: {res_backend.text}")
+
+        except Exception as e:
+            print(f"Erreur API : {e}")
             self.pandoo_advice = "Erreur de connexion."
 
     def build(self): return WindowManager()
