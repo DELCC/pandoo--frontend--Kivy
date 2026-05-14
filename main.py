@@ -583,6 +583,25 @@ class CreateUserScreen(Screen):
         else:
             self.error_msg = "Ce nom d'utilisateur est indisponible."
 
+    def login_with_google(self):
+        """Redirige vers l'auth Google et lance la vérification"""
+        webbrowser.open(f"{BACKEND_URL}/auth/login")
+        self.check_event = Clock.schedule_interval(self.check_login_status, 2)
+
+    def check_login_status(self, dt):
+        """Vérifie si l'utilisateur est bien enregistré après l'auth Google"""
+        try:
+            email_to_check = "amaury.jacobe1@gmail.com"
+            res = requests.get(f"{BACKEND_URL}/users/by-email/{email_to_check}", timeout=2)
+            if res.status_code == 200:
+                user_data = res.json()
+                new_id = user_data.get("id")
+                App.get_running_app().user_id = new_id
+                Clock.unschedule(self.check_event)
+                self.manager.current = "child_list"
+        except: 
+            pass
+
 class LoginScreen(Screen):
     def login_user(self):
         username = self.ids.login_user.ids.ti.text.strip()
