@@ -289,7 +289,7 @@ Builder.load_string('''
                 height: '60dp'
                 on_release: root.create_child(more=True)
             Button:
-                text: "J'AI FINI D'AJOUTER"
+                text: "VOIR MA LISTE"
                 size_hint_y: None
                 height: '40dp'
                 background_color: (0,0,0,0)
@@ -310,7 +310,7 @@ Builder.load_string('''
                 size_hint_y: None
                 height: '60dp'
                 BackButton:
-                    on_release: root.manager.current = "login"
+                    on_release: root.manager.current = "start"
             Label:
                 text: "QUI VA MANGER ?"
                 font_size: '28sp'
@@ -325,7 +325,7 @@ Builder.load_string('''
                     height: self.minimum_height
                     spacing: 15
             RoundedButton:
-                text: "+ AJOUTER UN AUTRE"
+                text: "+ AJOUTER UN ENFANT"
                 size_hint_y: None
                 height: '60dp'
                 on_release: root.manager.current = "add_child"
@@ -386,6 +386,7 @@ Builder.load_string('''
                     text_size: self.width, None
                 Label:
                     text: app.pandoo_advice
+                    markup: True
                     font_size: '15sp'
                     italic: True
                     color: (0.15, 0.7, 0.5, 1)
@@ -437,9 +438,12 @@ class CreateUserScreen(Screen):
             res = requests.post(f"{BACKEND_URL}/users/", json=payload, timeout=5)
             if res.status_code in [200, 201]:
                 user_data = res.json()
-                App.get_running_app().user_id = user_data.get("id", 1)
-                self.manager.current = "add_child"
-        except: pass
+                new_id = user_data.get("id") or user_data.get("user_id", 0)
+                App.get_running_app().user_id = new_id
+                # Retour vers l'accueil pour se connecter
+                self.manager.current = "start"
+        except Exception as e: 
+            print(f"Erreur d'inscription: {e}")
 
     def login_with_google(self):
         webbrowser.open(f"{BACKEND_URL}/auth/login")
@@ -451,14 +455,25 @@ class CreateUserScreen(Screen):
             res = requests.get(f"{BACKEND_URL}/users/by-email/{email_to_check}", timeout=2)
             if res.status_code == 200:
                 user_data = res.json()
-                App.get_running_app().user_id = user_data["id"]
+                new_id = user_data.get("id") or user_data.get("user_id", 0)
+                App.get_running_app().user_id = new_id
                 Clock.unschedule(self.check_event)
-                self.manager.current = "add_child"
+                self.manager.current = "start"
         except: pass
 
 class LoginScreen(Screen):
     def login_user(self):
-        if self.ids.login_user.ids.ti.text: self.manager.current = "child_list"
+        username = self.ids.login_user.ids.ti.text
+        if username:
+            try:
+                res = requests.get(f"{BACKEND_URL}/users/by-username/{username}", timeout=2)
+                if res.status_code == 200:
+                    user_data = res.json()
+                    new_id = user_data.get("id") or user_data.get("user_id", 0)
+                    App.get_running_app().user_id = new_id
+                    self.manager.current = "child_list"
+            except Exception as e:
+                print(f"Erreur de connexion : {e}")
 
     def login_with_google(self):
         webbrowser.open(f"{BACKEND_URL}/auth/login")
@@ -470,7 +485,8 @@ class LoginScreen(Screen):
             res = requests.get(f"{BACKEND_URL}/users/by-email/{email_to_check}", timeout=2)
             if res.status_code == 200:
                 user_data = res.json()
-                App.get_running_app().user_id = user_data["id"]
+                new_id = user_data.get("id") or user_data.get("user_id", 0)
+                App.get_running_app().user_id = new_id
                 Clock.unschedule(self.check_event)
                 self.manager.current = "child_list"
         except: pass
@@ -480,39 +496,46 @@ class AddChildScreen(Screen):
         name = self.ids.child_name.ids.ti.text
         age = self.ids.child_age.ids.ti.text
         parent_id = App.get_running_app().user_id
-        if not name or not age: return
-        try:
-            payload = {"name": name, "age": int(age), "id_parent": parent_id}
-            res = requests.post(f"{BACKEND_URL}/children/", json=payload, timeout=5)
-            if res.status_code in [200, 201]: 
-                self.ids.child_name.ids.ti.text = ""
-                self.ids.child_age.ids.ti.text = ""
-                if not more: self.manager.current = "login"
-        except: pass
+        
+        if name and age and parent_id != 0:
+            try:
+                payload = {"name": name, "age": int(age), "id_parent": parent_id}
+                res = requests.post(f"{BACKEND_URL}/children/", json=payload, timeout=5)
+                if res.status_code in [200, 201]: 
+                    self.ids.child_name.ids.ti.text = ""
+                    self.ids.child_age.ids.ti.text = ""
+            except: pass
+
+        if not more:
+            self.manager.current = "child_list"
 
 class ChildListScreen(Screen):
     def on_enter(self):
         self.ids.container.clear_widgets()
         parent_id = App.get_running_app().user_id
+        
+        if parent_id == 0:
+            self.manager.current = "start"
+            return
+
         try:
             res = requests.get(f"{BACKEND_URL}/children/parent/{parent_id}", timeout=5)
             if res.status_code == 200:
                 from kivy.uix.button import Button
                 from kivy.graphics import Color, RoundedRectangle
-                for child in res.json():
+                children = res.json()
+                for child in children:
                     btn = Button(
                         text=f"{child['name']} ({child['age']} ans)", 
                         size_hint_y=None, 
                         height='55dp',
                         background_color=(0,0,0,0),
                         color=(0.1, 0.1, 0.1, 1),
-                        bold=True,
-                        font_size='16sp'
+                        bold=True
                     )
                     with btn.canvas.before:
                         Color(1, 1, 1, 0.95)
                         btn.rect = RoundedRectangle(pos=btn.pos, size=btn.size, radius=[15,])
-                    
                     btn.bind(pos=self.update_rect, size=self.update_rect)
                     btn.bind(on_release=lambda x, c=child: self.select_child(c))
                     self.ids.container.add_widget(btn)
@@ -552,7 +575,7 @@ class PandooApp(App):
     nutrition_info = StringProperty("")
     pandoo_advice = StringProperty("Analyse en cours...")
     status_text = StringProperty("Scannez un produit")
-    user_id = 1
+    user_id = 0 
     active_child_id = 1
 
     def open_google_search(self):
@@ -569,15 +592,70 @@ class PandooApp(App):
                 if data_off.get("status") == 1:
                     p = data_off["product"]
                     n = p.get("nutriments", {})
-                    self.product_name = p.get('product_name', 'Produit')
-                    self.nutrition_info = f"Énergie : {n.get('energy-kcal_100g', 0)} kcal\nSucres : {n.get('sugars_100g', 0)}g"
                     
-                    payload = {"barcode": str(code), "name": self.product_name, "id_child": self.active_child_id}
-                    res_back = requests.post(f"{BACKEND_URL}/products/?id_child={self.active_child_id}", json=payload, timeout=5)
+                    self.product_name = p.get('product_name', 'Produit inconnu')
+                    
+                    # --- VALEURS NUTRITIVES COLORÉES ---
+                    kcal = n.get('energy-kcal_100g', 0)
+                    sucres = n.get('sugars_100g', 0)
+                    sel = n.get('salt_100g', 0)
+
+                    # Seuils de couleur
+                    color_kcal = "ff3333" if kcal > 400 else "22cc22"
+                    color_sucres = "ff3333" if sucres > 15 else "22cc22"
+                    color_sel = "ff3333" if sel > 1.5 else "22cc22"
+
+                    self.nutrition_info = (
+                        f"Énergie : [color={color_kcal}]{kcal} kcal[/color]\n"
+                        f"Sucres : [color={color_sucres}]{sucres}g[/color]\n"
+                        f"Sel : [color={color_sel}]{sel}g[/color]"
+                    )
+                    
+                    # Préparation du payload complet pour satisfaire le backend
+                    payload = {
+                        "barcode": str(code),
+                        "name": str(self.product_name),
+                        "brand": str(p.get('brands', 'Inconnue')),
+                        "type": str(p.get('categories', 'Aliment')),
+                        "calories": float(kcal),
+                        "glucides": float(n.get('carbohydrates_100g', 0)),
+                        "calcium": float(n.get('calcium_100g', 0)),
+                        "proteins": float(n.get('proteins_100g', 0)),
+                        "lipids": float(n.get('fat_100g', 0)),
+                        "salt": float(sel),
+                        "id_child": int(self.active_child_id)
+                    }
+                    
+                    # Envoi au backend
+                    res_back = requests.post(
+                        f"{BACKEND_URL}/products/?id_child={self.active_child_id}", 
+                        json=payload, 
+                        timeout=5
+                    )
+                    
                     if res_back.status_code == 200:
                         analysis = res_back.json().get("analysis", {})
-                        self.pandoo_advice = "\n".join(analysis.get("tips", [])) if analysis.get("tips") else "Produit OK !"
-        except Exception: pass
+                        tips = analysis.get("tips", [])
+                        
+                        if tips:
+                            formatted_tips = ""
+                            for tip in tips:
+                                # Coloration des conseils
+                                if any(word in tip.lower() for word in ["trop", "attention", "mauvais", "éviter", "limiter"]):
+                                    formatted_tips += f"[color=ff3333]• {tip}[/color]\n"
+                                elif any(word in tip.lower() for word in ["bien", "excellent", "bon", "parfait"]):
+                                    formatted_tips += f"[color=22cc22]• {tip}[/color]\n"
+                                else:
+                                    formatted_tips += f"• {tip}\n"
+                            self.pandoo_advice = formatted_tips
+                        else:
+                            self.pandoo_advice = "Analyse terminée !"
+                    else:
+                        print(f"Erreur Backend {res_back.status_code}: {res_back.text}")
+                        self.pandoo_advice = "[color=ff9900]Erreur de validation backend.[/color]"
+        except Exception as e:
+            print(f"Erreur globale : {e}")
+            self.pandoo_advice = "Problème de connexion."
 
     def build(self): return WindowManager()
 
