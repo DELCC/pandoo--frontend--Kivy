@@ -3,6 +3,7 @@ import urllib.request
 import numpy as np
 import requests
 import json
+import webbrowser
 from kivy.config import Config
 
 # --- CONFIGURATION DE LA FENÊTRE ---
@@ -14,7 +15,7 @@ from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.clock import Clock
 from kivy.graphics.texture import Texture
-from kivy.properties import StringProperty, DictProperty
+from kivy.properties import StringProperty
 from pyzbar.pyzbar import decode
 from kivy.lang import Builder
 from kivy.uix.behaviors import ButtonBehavior
@@ -47,6 +48,7 @@ Builder.load_string('''
     CreateUserScreen:
     LoginScreen:
     AddChildScreen:
+    ChildListScreen:
     ScanScreen:
     DetailsScreen:
 
@@ -171,7 +173,6 @@ Builder.load_string('''
                     size_hint_y: None
                     height: '60dp'
                     on_release: root.validate_and_create()
-                
                 Button:
                     text: "S'INSCRIRE AVEC GOOGLE"
                     size_hint_y: None
@@ -239,7 +240,7 @@ Builder.load_string('''
                     EyeButton:
                         on_release: login_pass.password = not login_pass.password
                         Image:
-                            source: 'eye_on.png' if login_pass.password else 'eye_off.png'
+                            source: 'eye_off.png' if login_pass.password else 'eye_on.png'
                             size_hint: None, None
                             size: '22dp', '22dp'
                             opacity: 0.6
@@ -248,7 +249,6 @@ Builder.load_string('''
                     size_hint_y: None
                     height: '60dp'
                     on_release: root.login_user()
-                
                 Button:
                     text: "SE CONNECTER AVEC GOOGLE"
                     size_hint_y: None
@@ -274,8 +274,8 @@ Builder.load_string('''
             padding: [40, 60]
             spacing: 20
             Label:
-                text: "TON ENFANT"
-                font_size: '32sp'
+                text: "AJOUTER UN ENFANT"
+                font_size: '28sp'
                 bold: True
             BaseInput:
                 id: child_name
@@ -284,10 +284,51 @@ Builder.load_string('''
                 id: child_age
                 hint_text: "Âge"
             RoundedButton:
-                text: "ENREGISTRER"
+                text: "AJOUTER"
                 size_hint_y: None
                 height: '60dp'
-                on_release: root.create_child()
+                on_release: root.create_child(more=True)
+            Button:
+                text: "J'AI FINI D'AJOUTER"
+                size_hint_y: None
+                height: '40dp'
+                background_color: (0,0,0,0)
+                color: (1,1,1,1)
+                underline: True
+                on_release: root.create_child(more=False)
+
+<ChildListScreen>:
+    name: "child_list"
+    RelativeLayout:
+        BackgroundLayer:
+        BoxLayout:
+            orientation: 'vertical'
+            padding: [30, 20]
+            spacing: 20
+            AnchorLayout:
+                anchor_x: 'left'
+                size_hint_y: None
+                height: '60dp'
+                BackButton:
+                    on_release: root.manager.current = "login"
+            Label:
+                text: "QUI VA MANGER ?"
+                font_size: '28sp'
+                bold: True
+                size_hint_y: None
+                height: '60dp'
+            ScrollView:
+                BoxLayout:
+                    id: container
+                    orientation: 'vertical'
+                    size_hint_y: None
+                    height: self.minimum_height
+                    spacing: 15
+            RoundedButton:
+                text: "+ AJOUTER UN AUTRE"
+                size_hint_y: None
+                height: '60dp'
+                on_release: root.manager.current = "add_child"
 
 <ScanScreen>:
     name: "scan"
@@ -317,18 +358,16 @@ Builder.load_string('''
         BackgroundLayer:
         BoxLayout:
             orientation: 'vertical'
-            padding: [30, 40]
-            spacing: 15
+            padding: [30, 30]
+            spacing: 12
             Label:
                 text: "LE VERDICT DE PANDOO"
                 font_size: '28sp'
                 bold: True
-                size_hint_y: None
-                height: '50dp'
             BoxLayout:
                 orientation: 'vertical'
-                padding: [25, 20]
-                spacing: 10
+                padding: [25, 15]
+                spacing: 8
                 canvas.before:
                     Color:
                         rgba: (1, 1, 1, 1)
@@ -345,7 +384,6 @@ Builder.load_string('''
                     size_hint_y: None
                     height: '50dp'
                     text_size: self.width, None
-                
                 Label:
                     text: app.pandoo_advice
                     font_size: '15sp'
@@ -355,7 +393,6 @@ Builder.load_string('''
                     size_hint_y: None
                     height: '80dp'
                     text_size: self.width, None
-                
                 Widget:
                     size_hint_y: None
                     height: '2dp'
@@ -365,31 +402,22 @@ Builder.load_string('''
                         Rectangle:
                             pos: self.x + 30, self.y
                             size: self.width - 60, self.height
-                
-                Label:
-                    text: "[i]Valeurs pour 100g :[/i]"
-                    markup: True
-                    font_size: '14sp'
-                    color: (0.4, 0.4, 0.4, 1)
-                    size_hint_y: None
-                    height: '25dp'
-                    halign: 'left'
-                    text_size: self.width, None
                 Label:
                     text: app.nutrition_info
-                    markup: True  # --- ACTIVATION MARKUP COULEUR ---
+                    markup: True
                     font_size: '16sp'
                     color: (0.2, 0.2, 0.2, 1)
                     halign: 'left'
-                    valign: 'top'
                     text_size: self.width, None
-                    line_height: 1.2
-            Widget:
-                size_hint_y: 0.05
+            RoundedButton:
+                text: "VOIR SUR GOOGLE"
+                size_hint_y: None
+                height: '50dp'
+                on_release: app.open_google_search()
             RoundedButton:
                 text: "RESCANNER"
                 size_hint_y: None
-                height: '60dp'
+                height: '50dp'
                 on_release: root.manager.current = "scan"
 ''')
 
@@ -414,7 +442,6 @@ class CreateUserScreen(Screen):
         except: pass
 
     def login_with_google(self):
-        import webbrowser
         webbrowser.open(f"{BACKEND_URL}/auth/login")
         self.check_event = Clock.schedule_interval(self.check_auth_status, 2)
 
@@ -429,24 +456,11 @@ class CreateUserScreen(Screen):
                 self.manager.current = "add_child"
         except: pass
 
-class AddChildScreen(Screen):
-    def create_child(self):
-        name = self.ids.child_name.ids.ti.text
-        age = self.ids.child_age.ids.ti.text
-        parent_id = App.get_running_app().user_id
-        try:
-            payload = {"name": name, "age": int(age), "id_parent": parent_id}
-            res = requests.post(f"{BACKEND_URL}/children/", json=payload, timeout=5)
-            if res.status_code in [200, 201]: 
-                self.manager.current = "login"
-        except: pass
-
 class LoginScreen(Screen):
     def login_user(self):
-        if self.ids.login_user.ids.ti.text: self.manager.current = "scan"
+        if self.ids.login_user.ids.ti.text: self.manager.current = "child_list"
 
     def login_with_google(self):
-        import webbrowser
         webbrowser.open(f"{BACKEND_URL}/auth/login")
         self.check_event = Clock.schedule_interval(self.check_login_status, 2)
 
@@ -458,8 +472,59 @@ class LoginScreen(Screen):
                 user_data = res.json()
                 App.get_running_app().user_id = user_data["id"]
                 Clock.unschedule(self.check_event)
-                self.manager.current = "scan"
+                self.manager.current = "child_list"
         except: pass
+
+class AddChildScreen(Screen):
+    def create_child(self, more=True):
+        name = self.ids.child_name.ids.ti.text
+        age = self.ids.child_age.ids.ti.text
+        parent_id = App.get_running_app().user_id
+        if not name or not age: return
+        try:
+            payload = {"name": name, "age": int(age), "id_parent": parent_id}
+            res = requests.post(f"{BACKEND_URL}/children/", json=payload, timeout=5)
+            if res.status_code in [200, 201]: 
+                self.ids.child_name.ids.ti.text = ""
+                self.ids.child_age.ids.ti.text = ""
+                if not more: self.manager.current = "login"
+        except: pass
+
+class ChildListScreen(Screen):
+    def on_enter(self):
+        self.ids.container.clear_widgets()
+        parent_id = App.get_running_app().user_id
+        try:
+            res = requests.get(f"{BACKEND_URL}/children/parent/{parent_id}", timeout=5)
+            if res.status_code == 200:
+                from kivy.uix.button import Button
+                from kivy.graphics import Color, RoundedRectangle
+                for child in res.json():
+                    btn = Button(
+                        text=f"{child['name']} ({child['age']} ans)", 
+                        size_hint_y=None, 
+                        height='55dp',
+                        background_color=(0,0,0,0),
+                        color=(0.1, 0.1, 0.1, 1),
+                        bold=True,
+                        font_size='16sp'
+                    )
+                    with btn.canvas.before:
+                        Color(1, 1, 1, 0.95)
+                        btn.rect = RoundedRectangle(pos=btn.pos, size=btn.size, radius=[15,])
+                    
+                    btn.bind(pos=self.update_rect, size=self.update_rect)
+                    btn.bind(on_release=lambda x, c=child: self.select_child(c))
+                    self.ids.container.add_widget(btn)
+        except: pass
+
+    def update_rect(self, instance, value):
+        instance.rect.pos = instance.pos
+        instance.rect.size = instance.size
+
+    def select_child(self, child_data):
+        App.get_running_app().active_child_id = child_data['id']
+        self.manager.current = "scan"
 
 class ScanScreen(Screen):
     def on_enter(self): self.update_event = Clock.schedule_interval(self.update, 1.0 / 30.0)
@@ -488,81 +553,31 @@ class PandooApp(App):
     pandoo_advice = StringProperty("Analyse en cours...")
     status_text = StringProperty("Scannez un produit")
     user_id = 1
+    active_child_id = 1
 
-    def get_pandoo_color(self, value, type_nutri):
-        """Calcul de la couleur basé sur les seuils officiels 100g"""
-        try:
-            val = float(value)
-            # Seuils basés sur Nutri-Score / ANSES
-            thresholds = {
-                "sucres": {"orange": 13.5, "rouge": 18.0},
-                "sel": {"orange": 0.9, "rouge": 1.5}
-            }
-            limits = thresholds.get(type_nutri)
-            if not limits: return "333333"
-
-            green_limit = limits["orange"] * 0.75
-            if val <= green_limit: return "228B22"  # Vert
-            elif val <= limits["rouge"]: return "FFA500"  # Orange
-            else: return "FF0000"  # Rouge
-        except: return "333333"
+    def open_google_search(self):
+        query = self.product_name.replace("\n", " ").replace(" ", "+")
+        webbrowser.open(f"https://www.google.com/search?q={query}")
 
     def save_to_backend(self, code):
         headers = {'User-Agent': 'PandooApp - Python/Kivy'}
         try:
             url_off = f"https://world.openfoodfacts.org/api/v0/product/{code}.json"
             res_off = requests.get(url_off, headers=headers, timeout=5)
-            
             if res_off.status_code == 200:
                 data_off = res_off.json()
                 if data_off.get("status") == 1:
                     p = data_off["product"]
                     n = p.get("nutriments", {})
-                    brand = p.get("brands", "Inconnu").split(',')[0]
+                    self.product_name = p.get('product_name', 'Produit')
+                    self.nutrition_info = f"Énergie : {n.get('energy-kcal_100g', 0)} kcal\nSucres : {n.get('sugars_100g', 0)}g"
                     
-                    self.product_name = f"{p.get('product_name', 'Produit')}\n({brand})"
-                    
-                    # --- APPLICATION DES COULEURS DYNAMIQUES ---
-                    val_sucre = n.get('sugars_100g', 0)
-                    val_sel = n.get('salt_100g', 0)
-                    col_sucre = self.get_pandoo_color(val_sucre, "sucres")
-                    col_sel = self.get_pandoo_color(val_sel, "sel")
-
-                    self.nutrition_info = (
-                        f"Énergie : {n.get('energy-kcal_100g', 0)} kcal\n"
-                        f"Sucres : [color={col_sucre}]{val_sucre} g[/color]\n"
-                        f"Sel : [color={col_sel}]{val_sel} g[/color]\n"
-                        f"Protéines : {n.get('proteins_100g', 0)} g"
-                    )
-
-                    payload = {
-                        "barcode": str(code),
-                        "name": p.get("product_name", "Inconnu"),
-                        "brand": brand,
-                        "type": str(p.get("categories", "Aliment")).split(',')[0],
-                        "calories": float(n.get("energy-kcal_100g", 0)),
-                        "glucides": float(n.get("carbohydrates_100g", 0)),
-                        "proteins": float(n.get("proteins_100g", 0)),
-                        "lipids": float(n.get("fat_100g", 0)),
-                        "salt": float(n.get("salt_100g", 0)),
-                        "calcium": float(n.get("calcium_100g", 0)),
-                        "id_child": 1
-                    }
-                    
-                    res_back = requests.post(f"{BACKEND_URL}/products/?id_child=1", json=payload, timeout=5)
-                    
+                    payload = {"barcode": str(code), "name": self.product_name, "id_child": self.active_child_id}
+                    res_back = requests.post(f"{BACKEND_URL}/products/?id_child={self.active_child_id}", json=payload, timeout=5)
                     if res_back.status_code == 200:
-                        data_back = res_back.json()
-                        analysis = data_back.get("analysis", {})
-                        all_messages = analysis.get("tips", []) + analysis.get("alerts", [])
-                        if all_messages:
-                            self.pandoo_advice = "\n".join(all_messages)
-                        else:
-                            self.pandoo_advice = "Ce produit semble équilibré pour ton âge ! ✨"
-                            
-        except Exception as e:
-            self.product_name = "Erreur"
-            self.pandoo_advice = "Connexion au serveur impossible"
+                        analysis = res_back.json().get("analysis", {})
+                        self.pandoo_advice = "\n".join(analysis.get("tips", [])) if analysis.get("tips") else "Produit OK !"
+        except Exception: pass
 
     def build(self): return WindowManager()
 
