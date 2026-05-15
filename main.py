@@ -5,6 +5,7 @@ import requests
 import json
 import webbrowser
 import re
+from datetime import datetime
 from kivy.config import Config
 
 # --- CONFIGURATION DE LA FENÊTRE ---
@@ -334,15 +335,15 @@ Builder.load_string('''
                 id: child_name
                 hint_text: "Prénom"
             BaseInput:
-                id: child_age
-                hint_text: "Âge"
+                id: child_birthdate
+                hint_text: "Date de naissance (ex: 04072021)"
             RoundedButton:
                 text: "AJOUTER UN PANDOO"
                 size_hint_y: None
                 height: '60dp'
                 on_release: root.create_child(more=True)
             RoundedButton:
-                text: "VOIR MA LISTE"
+                text: "VOIR MES PANDOO'S"
                 size_hint_y: None
                 height: '45dp'
                 on_release: root.create_child(more=False)
@@ -472,7 +473,7 @@ Builder.load_string('''
                         halign: 'center'
                     
                     Button:
-                        text: "⚠️ ALLERGÈNES"
+                        text: "ALLERGÈNES"
                         size_hint_y: None
                         height: '40dp'
                         bold: True
@@ -661,23 +662,46 @@ class LoginScreen(Screen):
             pass
 
 class AddChildScreen(Screen):
+    def normalize_date(self, raw_date):
+        """Transforme n'importe quel format de date en AAAA-MM-JJ"""
+        clean_date = re.sub(r"[-/\s]", "", raw_date)
+        if len(clean_date) == 8 and clean_date.isdigit():
+            if int(clean_date[:2]) <= 31 and int(clean_date[2:4]) <= 12:
+                return f"{clean_date[4:]}-{clean_date[2:4]}-{clean_date[:2]}"
+            return f"{clean_date[:4]}-{clean_date[4:6]}-{clean_date[6:]}"
+        return raw_date
+
     def create_child(self, more=True):
-        name = self.ids.child_name.ids.ti.text
-        age = self.ids.child_age.ids.ti.text
+        name = self.ids.child_name.ids.ti.text.strip()
+        raw_date = self.ids.child_birthdate.ids.ti.text.strip()
         parent_id = App.get_running_app().user_id
         
-        if name and age and parent_id != 0:
-            try:
-                payload = {"name": name, "age": int(age), "id_parent": parent_id}
-                res = requests.post(f"{BACKEND_URL}/children/", json=payload, timeout=5)
-                if res.status_code in [200, 201]:
-                    self.ids.child_name.ids.ti.text = ""
-                    self.ids.child_age.ids.ti.text = ""
-            except Exception:
-                pass
+        normalized_birthdate = self.normalize_date(raw_date)
         
-        if not more:
-            self.manager.current = "child_list"
+        if name and normalized_birthdate and parent_id != 0:
+            try:
+                # ON SUPPRIME LE CHAMP "age" car il n'existe pas dans ton modèle SQLAlchemy
+                payload = {
+                    "name": str(name),
+                    "birthdate": str(normalized_birthdate),
+                    "id_parent": int(parent_id)
+                }
+                
+                print(f"Tentative d'envoi sans le champ age : {payload}")
+                res = requests.post(f"{BACKEND_URL}/children/", json=payload, timeout=5)
+                
+                if res.status_code in [200, 201]:
+                    print("Pandoo créé avec succès !")
+                    self.ids.child_name.ids.ti.text = ""
+                    self.ids.child_birthdate.ids.ti.text = ""
+                    # Rafraîchir la liste ou changer d'écran
+                    if not more:
+                        self.manager.current = "child_list"
+                else:
+                    print(f"Erreur {res.status_code}: {res.text}")
+                    
+            except Exception as e:
+                print(f"Erreur de connexion : {e}")
 
 class ChildListScreen(Screen):
     def on_enter(self):
@@ -694,8 +718,9 @@ class ChildListScreen(Screen):
                 children = res.json()
                 from kivy.graphics import Color, RoundedRectangle
                 for child in children:
+                    age = App.get_running_app().calculate_age(child['birthdate'])
                     btn = Button(
-                        text=f"{child['name']} ({child['age']} ans)",
+                        text=f"{child['name']} ({age} ans)",
                         size_hint_y=None,
                         height='55dp',
                         background_color=(0, 0, 0, 0),
@@ -717,6 +742,7 @@ class ChildListScreen(Screen):
 
     def select_child(self, child_data):
         App.get_running_app().active_child_id = child_data['id']
+        App.get_running_app().active_child_birthdate = child_data['birthdate']
         self.manager.current = "scan"
 
 class ScanScreen(Screen):
@@ -750,27 +776,12 @@ class ScanScreen(Screen):
 class DetailsScreen(Screen):
     def show_allergens_popup(self):
         content = BoxLayout(orientation='vertical', padding=20, spacing=15)
-        
-        allergens_text = App.get_running_app().product_allergens
-        if not allergens_text or allergens_text.strip() == "":
-            allergens_text = "Aucun allergène répertorié."
+        allergens_text = App.get_running_app().product_allergens or "Aucun allergène répertorié."
 
-        lbl = Label(
-            text=allergens_text,
-            halign="center",
-            valign="middle",
-            color=(0.95, 0.95, 0.95, 1),
-            font_size="16sp"
-        )
+        lbl = Label(text=allergens_text, halign="center", valign="middle", color=(0.95, 0.95, 0.95, 1), font_size="16sp")
         lbl.bind(size=lbl.setter('text_size'))
         
-        btn_close = Button(
-            text="Fermer",
-            size_hint=(1, None),
-            height='50dp',
-            background_color=(0,0,0,0),
-            bold=True
-        )
+        btn_close = Button(text="Fermer", size_hint=(1, None), height='50dp', background_color=(0,0,0,0), bold=True)
         with btn_close.canvas.before:
             from kivy.graphics import Color, RoundedRectangle
             Color(0.15, 0.75, 0.5, 1)
@@ -782,15 +793,7 @@ class DetailsScreen(Screen):
         content.add_widget(lbl)
         content.add_widget(btn_close)
 
-        popup = Popup(
-            title="ALLERGÈNES DÉTECTÉS",
-            content=content,
-            size_hint=(0.85, 0.5),
-            auto_dismiss=True,
-            background_color=(1, 1, 1, 1),
-            title_color=(0.9, 0.2, 0.2, 1),
-            title_align="center"
-        )
+        popup = Popup(title="ALLERGÈNES DÉTECTÉS", content=content, size_hint=(0.85, 0.5), background_color=(1, 1, 1, 1), title_color=(0.9, 0.2, 0.2, 1), title_align="center")
         btn_close.bind(on_release=popup.dismiss)
         popup.open()
 
@@ -804,30 +807,14 @@ class HistoryScreen(Screen):
                 products = res.json()
                 from kivy.graphics import Color, RoundedRectangle
                 for prod in reversed(products):
-                    # Formatage du texte : Nom en gras, marque en plus petit dessous
                     btn_text = f"[b]{prod['name']}[/b]\n[size=13sp]{prod.get('brand', 'Marque inconnue')}[/size]"
-                    
-                    btn = Button(
-                        text=btn_text,
-                        markup=True,
-                        size_hint_y=None,
-                        height='75dp',
-                        background_color=(0,0,0,0),
-                        color=(0.1, 0.1, 0.1, 1),
-                        halign='center',
-                        valign='middle'
-                    )
-                    btn.bind(size=btn.setter('text_size')) # Pour l'alignement du texte
-                    
+                    btn = Button(text=btn_text, markup=True, size_hint_y=None, height='75dp', background_color=(0,0,0,0), color=(0.1, 0.1, 0.1, 1), halign='center', valign='middle')
+                    btn.bind(size=btn.setter('text_size'))
                     with btn.canvas.before:
                         Color(1, 1, 1, 0.9)
                         btn.rect = RoundedRectangle(pos=btn.pos, size=btn.size, radius=[15,])
-                    
                     btn.bind(pos=self.update_rect, size=self.update_rect)
-                    
-                    # Clic sur le produit -> relance l'analyse et va aux détails
                     btn.bind(on_release=lambda x, b=prod['barcode']: self.load_product_details(b))
-                    
                     self.ids.history_container.add_widget(btn)
         except Exception:
             pass
@@ -837,7 +824,6 @@ class HistoryScreen(Screen):
         instance.rect.size = instance.size
 
     def load_product_details(self, barcode):
-        # On utilise la fonction existante pour récupérer les données OpenFoodFacts
         App.get_running_app().save_to_backend(barcode)
         self.manager.current = "details"
 
@@ -852,17 +838,17 @@ class PandooApp(App):
     status_text = StringProperty("Scannez un produit")
     user_id = 0 
     active_child_id = 1
+    active_child_birthdate = "2020-01-01"
 
-    # Dictionnaire pour le filtrage français
-    TRANSLATIONS = {
-        "Milk": "Lait",
-        "Nuts": "Noisettes",
-        "Eggs": "Œufs",
-        "Peanuts": "Arachides",
-        "Soybeans": "Soja",
-        "Wheat": "Blé",
-        "Hazelnuts": "Noisettes"
-    }
+    TRANSLATIONS = {"Milk": "Lait", "Nuts": "Noisettes", "Eggs": "Œufs", "Peanuts": "Arachides", "Soybeans": "Soja", "Wheat": "Blé", "Hazelnuts": "Noisettes"}
+
+    def calculate_age(self, birthdate_str):
+        try:
+            birthdate = datetime.strptime(birthdate_str, "%Y-%m-%d")
+            today = datetime.today()
+            return today.year - birthdate.year - ((today.month, today.day) < (birthdate.month, birthdate.day))
+        except:
+            return 0
 
     def open_google_search(self):
         query = self.product_name.replace("\n", " ").replace(" ", "+")
