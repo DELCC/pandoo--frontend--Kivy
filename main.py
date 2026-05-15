@@ -327,7 +327,7 @@ Builder.load_string('''
             padding: [40, 60]
             spacing: 20
             Label:
-                text: "AJOUTER UN ENFANT"
+                text: "AJOUTER UN PANDOO"
                 font_size: '28sp'
                 bold: True
             BaseInput:
@@ -337,17 +337,14 @@ Builder.load_string('''
                 id: child_age
                 hint_text: "Âge"
             RoundedButton:
-                text: "AJOUTER"
+                text: "AJOUTER UN PANDOO"
                 size_hint_y: None
                 height: '60dp'
                 on_release: root.create_child(more=True)
-            Button:
+            RoundedButton:
                 text: "VOIR MA LISTE"
                 size_hint_y: None
-                height: '40dp'
-                background_color: (0,0,0,0)
-                color: (1,1,1,1)
-                underline: True
+                height: '45dp'
                 on_release: root.create_child(more=False)
 
 <ChildListScreen>:
@@ -365,7 +362,7 @@ Builder.load_string('''
                 BackButton:
                     on_release: root.manager.current = "start"
             Label:
-                text: "QUI VA MANGER ?"
+                text: "QUEL PANDOO VA MANGER ?"
                 font_size: '28sp'
                 bold: True
                 size_hint_y: None
@@ -378,7 +375,7 @@ Builder.load_string('''
                     height: self.minimum_height
                     spacing: 15
             RoundedButton:
-                text: "+ AJOUTER UN ENFANT"
+                text: "+ AJOUTER UN PANDOO"
                 size_hint_y: None
                 height: '60dp'
                 on_release: root.manager.current = "add_child"
