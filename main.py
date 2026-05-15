@@ -4,7 +4,7 @@ import numpy as np
 import requests
 import json
 import webbrowser
-import re  # Ajout pour la validation du mot de passe
+import re
 from kivy.config import Config
 
 # --- CONFIGURATION DE LA FENÊTRE ---
@@ -21,6 +21,10 @@ from pyzbar.pyzbar import decode
 from kivy.lang import Builder
 from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.popup import Popup
+from kivy.uix.label import Label
+from kivy.uix.button import Button
+from kivy.uix.scrollview import ScrollView
 
 # --- CONFIGURATION RÉSEAU ---
 URL_IMAGE = "http://192.168.1.157:8080/shot.jpg" 
@@ -52,6 +56,7 @@ Builder.load_string('''
     ChildListScreen:
     ScanScreen:
     DetailsScreen:
+    HistoryScreen:
 
 <BackButton@ButtonBehavior+BoxLayout>:
     size_hint: None, None
@@ -195,7 +200,6 @@ Builder.load_string('''
                             size: '22dp', '22dp'
                             opacity: 0.6
                 
-                # Rectangle d'erreur arrondi
                 BoxLayout:
                     size_hint_y: None
                     height: '65dp' if root.error_msg else '0dp'
@@ -469,6 +473,23 @@ Builder.load_string('''
                         height: self.texture_size[1]
                         text_size: self.width, None
                         halign: 'center'
+                    
+                    Button:
+                        text: "⚠️ ALLERGÈNES"
+                        size_hint_y: None
+                        height: '40dp'
+                        bold: True
+                        background_color: (0, 0, 0, 0)
+                        color: (1, 1, 1, 1)
+                        on_release: root.show_allergens_popup()
+                        canvas.before:
+                            Color:
+                                rgba: (1, 0.5, 0, 1)
+                            RoundedRectangle:
+                                pos: self.pos
+                                size: self.size
+                                radius: [10,]
+
                     Widget:
                         size_hint_y: None
                         height: '1dp'
@@ -490,86 +511,102 @@ Builder.load_string('''
         BoxLayout:
             orientation: 'vertical'
             size_hint: (0.85, None)
-            height: '110dp'
+            height: '170dp'
             pos_hint: {'center_x': 0.5, 'y': 0.05}
-            spacing: 12
+            spacing: 10
             RoundedButton:
                 text: "VOIR SUR GOOGLE"
                 on_release: app.open_google_search()
             RoundedButton:
+                text: "VOIR L'HISTORIQUE"
+                on_release: root.manager.current = "history"
+            RoundedButton:
                 text: "RETOUR AU SCANNER"
                 on_release: root.manager.current = "scan"
+
+<HistoryScreen>:
+    name: "history"
+    RelativeLayout:
+        BackgroundLayer:
+        BoxLayout:
+            orientation: 'vertical'
+            padding: [30, 20]
+            spacing: 20
+            AnchorLayout:
+                anchor_x: 'left'
+                size_hint_y: None
+                height: '60dp'
+                BackButton:
+                    on_release: root.manager.current = "details"
+            Label:
+                text: "HISTORIQUE"
+                font_size: '28sp'
+                bold: True
+                size_hint_y: None
+                height: '40dp'
+            ScrollView:
+                BoxLayout:
+                    id: history_container
+                    orientation: 'vertical'
+                    size_hint_y: None
+                    height: self.minimum_height
+                    spacing: 12
 ''')
 
-class BackButton(ButtonBehavior, BoxLayout): pass
-class StartScreen(Screen): pass
-class DetailsScreen(Screen): pass
-class WindowManager(ScreenManager): pass
+class BackButton(ButtonBehavior, BoxLayout):
+    pass
+
+class StartScreen(Screen):
+    pass
 
 class CreateUserScreen(Screen):
     error_msg = StringProperty("")
-
+    
     def validate_and_create(self):
         username = self.ids.new_user.ids.ti.text.strip()
         email = self.ids.new_email.ids.ti.text.strip()
-        password = self.ids.new_pass.text 
-        
+        password = self.ids.new_pass.text
+
         if not username or not email or not password:
             self.error_msg = "Tous les champs sont obligatoires."
             return
 
-        password_pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{10,}$"
-        if not re.match(password_pattern, password):
+        if not re.match(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{10,}$", password):
             self.error_msg = "Le mot de passe doit contenir :\n10 caractères, 1 majuscule, 1 minuscule et 1 chiffre."
             return
 
         self.error_msg = ""
-        # Le backend attend désormais 'username' explicitement
-        payload = {"name": username, "username": username, "email": email, "password": password}
-        
         try:
+            payload = {"name": username, "username": username, "email": email, "password": password}
             res = requests.post(f"{BACKEND_URL}/users/", json=payload, timeout=5)
             
-            # Gestion du doublon
             if res.status_code == 400:
                 self.suggest_new_username(username)
             elif res.status_code in [200, 201]:
                 user_data = res.json()
-                # On s'adapte à la structure de réponse du backend
-                new_id = user_data.get("user", {}).get("id") or user_data.get("id")
-                App.get_running_app().user_id = new_id
-                self.manager.current = "child_list" # Directement vers la liste après création
+                App.get_running_app().user_id = user_data.get("user", {}).get("id") or user_data.get("id")
+                self.manager.current = "child_list"
             else:
-                self.error_msg = f"Erreur ({res.status_code})"
-        except Exception as e: 
-            self.error_msg = "Serveur injoignable."
+                self.error_msg = f"Erreur lors de la création ({res.status_code})"
+        except Exception:
+            self.error_msg = "Le serveur est injoignable."
 
     def suggest_new_username(self, base_name):
-        """
-        Analyse le nom pour incrémenter intelligemment.
-        Ex: amo -> amo1, amo1 -> amo2, etc.
-        """
-        # On cherche si le nom finit déjà par des chiffres
         match = re.search(r"^(.*?)(\d+)$", base_name)
-        
         if match:
-            # Si on a "amo1", prefix="amo" et counter=2
             prefix = match.group(1)
             counter = int(match.group(2)) + 1
         else:
-            # Si on a "amo", prefix="amo" et counter=1
             prefix = base_name
             counter = 1
-            
+        
         found = False
         new_suggestion = base_name
-        
-        # Teste les noms sur le serveur (ex: amo1, amo2...)
         while not found and counter < 100:
             temp_name = f"{prefix}{counter}"
             try:
-                check = requests.get(f"{BACKEND_URL}/users/by-username/{temp_name}", timeout=2)
-                if check.status_code == 404: 
+                res = requests.get(f"{BACKEND_URL}/users/by-username/{temp_name}", timeout=2)
+                if res.status_code == 404:
                     new_suggestion = temp_name
                     found = True
                 else:
@@ -581,25 +618,21 @@ class CreateUserScreen(Screen):
             self.error_msg = f"Nom déjà pris. Essayez : {new_suggestion}"
             self.ids.new_user.ids.ti.text = new_suggestion
         else:
-            self.error_msg = "Ce nom d'utilisateur est indisponible."
+            self.error_msg = "Ce nom d'utilisateur est déjà utilisé."
 
     def login_with_google(self):
-        """Redirige vers l'auth Google et lance la vérification"""
         webbrowser.open(f"{BACKEND_URL}/auth/login")
         self.check_event = Clock.schedule_interval(self.check_login_status, 2)
 
     def check_login_status(self, dt):
-        """Vérifie si l'utilisateur est bien enregistré après l'auth Google"""
         try:
-            email_to_check = "amaury.jacobe1@gmail.com"
-            res = requests.get(f"{BACKEND_URL}/users/by-email/{email_to_check}", timeout=2)
+            res = requests.get(f"{BACKEND_URL}/users/by-email/amaury.jacobe1@gmail.com", timeout=2)
             if res.status_code == 200:
                 user_data = res.json()
-                new_id = user_data.get("id")
-                App.get_running_app().user_id = new_id
+                App.get_running_app().user_id = user_data.get("id")
                 Clock.unschedule(self.check_event)
                 self.manager.current = "child_list"
-        except: 
+        except:
             pass
 
 class LoginScreen(Screen):
@@ -610,13 +643,10 @@ class LoginScreen(Screen):
                 res = requests.get(f"{BACKEND_URL}/users/by-username/{username}", timeout=2)
                 if res.status_code == 200:
                     user_data = res.json()
-                    new_id = user_data.get("id")
-                    App.get_running_app().user_id = new_id
+                    App.get_running_app().user_id = user_data.get("id")
                     self.manager.current = "child_list"
-                else:
-                    # Ici on pourrait ajouter un error_msg pour le login aussi
-                    print("Utilisateur non trouvé")
-            except Exception as e: print(f"Erreur de connexion : {e}")
+            except:
+                pass
 
     def login_with_google(self):
         webbrowser.open(f"{BACKEND_URL}/auth/login")
@@ -624,53 +654,65 @@ class LoginScreen(Screen):
 
     def check_login_status(self, dt):
         try:
-            email_to_check = "amaury.jacobe1@gmail.com"
-            res = requests.get(f"{BACKEND_URL}/users/by-email/{email_to_check}", timeout=2)
+            res = requests.get(f"{BACKEND_URL}/users/by-email/amaury.jacobe1@gmail.com", timeout=2)
             if res.status_code == 200:
                 user_data = res.json()
-                new_id = user_data.get("id")
-                App.get_running_app().user_id = new_id
+                App.get_running_app().user_id = user_data.get("id")
                 Clock.unschedule(self.check_event)
                 self.manager.current = "child_list"
-        except: pass
+        except:
+            pass
 
 class AddChildScreen(Screen):
     def create_child(self, more=True):
         name = self.ids.child_name.ids.ti.text
         age = self.ids.child_age.ids.ti.text
         parent_id = App.get_running_app().user_id
+        
         if name and age and parent_id != 0:
             try:
                 payload = {"name": name, "age": int(age), "id_parent": parent_id}
                 res = requests.post(f"{BACKEND_URL}/children/", json=payload, timeout=5)
-                if res.status_code in [200, 201]: 
+                if res.status_code in [200, 201]:
                     self.ids.child_name.ids.ti.text = ""
                     self.ids.child_age.ids.ti.text = ""
-            except: pass
-        if not more: self.manager.current = "child_list"
+            except Exception:
+                pass
+        
+        if not more:
+            self.manager.current = "child_list"
 
 class ChildListScreen(Screen):
     def on_enter(self):
         self.ids.container.clear_widgets()
         parent_id = App.get_running_app().user_id
+        
         if parent_id == 0:
             self.manager.current = "start"
             return
+
         try:
             res = requests.get(f"{BACKEND_URL}/children/parent/{parent_id}", timeout=5)
             if res.status_code == 200:
-                from kivy.uix.button import Button
-                from kivy.graphics import Color, RoundedRectangle
                 children = res.json()
+                from kivy.graphics import Color, RoundedRectangle
                 for child in children:
-                    btn = Button(text=f"{child['name']} ({child['age']} ans)", size_hint_y=None, height='55dp', background_color=(0,0,0,0), color=(0.1, 0.1, 0.1, 1), bold=True)
+                    btn = Button(
+                        text=f"{child['name']} ({child['age']} ans)",
+                        size_hint_y=None,
+                        height='55dp',
+                        background_color=(0, 0, 0, 0),
+                        color=(0.1, 0.1, 0.1, 1),
+                        bold=True
+                    )
                     with btn.canvas.before:
                         Color(1, 1, 1, 0.95)
                         btn.rect = RoundedRectangle(pos=btn.pos, size=btn.size, radius=[15,])
                     btn.bind(pos=self.update_rect, size=self.update_rect)
                     btn.bind(on_release=lambda x, c=child: self.select_child(c))
                     self.ids.container.add_widget(btn)
-        except: pass
+        except Exception:
+            pass
 
     def update_rect(self, instance, value):
         instance.rect.pos = instance.pos
@@ -681,13 +723,18 @@ class ChildListScreen(Screen):
         self.manager.current = "scan"
 
 class ScanScreen(Screen):
-    def on_enter(self): self.update_event = Clock.schedule_interval(self.update, 1.0 / 30.0)
-    def on_leave(self): Clock.unschedule(self.update_event)
+    def on_enter(self):
+        self.update_event = Clock.schedule_interval(self.update, 1.0 / 30.0)
+
+    def on_leave(self):
+        Clock.unschedule(self.update_event)
+
     def update(self, dt):
         try:
             img_resp = urllib.request.urlopen(URL_IMAGE, timeout=1)
             img_np = np.array(bytearray(img_resp.read()), dtype=np.uint8)
             frame = cv2.imdecode(img_np, -1)
+
             if frame is not None:
                 for barcode in decode(frame):
                     code = barcode.data.decode('utf-8')
@@ -695,19 +742,130 @@ class ScanScreen(Screen):
                         Clock.unschedule(self.update_event)
                         App.get_running_app().save_to_backend(code)
                         self.manager.current = "details"
+
                 buf = cv2.flip(frame, 0).tobytes()
                 texture = Texture.create(size=(frame.shape[1], frame.shape[0]), colorfmt='bgr')
                 texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
                 self.ids.camera_preview.texture = texture
-        except: pass
+        except Exception:
+            pass
+
+class DetailsScreen(Screen):
+    def show_allergens_popup(self):
+        content = BoxLayout(orientation='vertical', padding=20, spacing=15)
+        
+        allergens_text = App.get_running_app().product_allergens
+        if not allergens_text or allergens_text.strip() == "":
+            allergens_text = "Aucun allergène répertorié."
+
+        lbl = Label(
+            text=allergens_text,
+            halign="center",
+            valign="middle",
+            color=(0.95, 0.95, 0.95, 1),
+            font_size="16sp"
+        )
+        lbl.bind(size=lbl.setter('text_size'))
+        
+        btn_close = Button(
+            text="Fermer",
+            size_hint=(1, None),
+            height='50dp',
+            background_color=(0,0,0,0),
+            bold=True
+        )
+        with btn_close.canvas.before:
+            from kivy.graphics import Color, RoundedRectangle
+            Color(0.15, 0.75, 0.5, 1)
+            btn_close.rect = RoundedRectangle(pos=btn_close.pos, size=btn_close.size, radius=[15])
+            
+        btn_close.bind(pos=lambda inst, pos: setattr(inst.rect, 'pos', pos))
+        btn_close.bind(size=lambda inst, size: setattr(inst.rect, 'size', size))
+
+        content.add_widget(lbl)
+        content.add_widget(btn_close)
+
+        popup = Popup(
+            title="ALLERGÈNES DÉTECTÉS",
+            content=content,
+            size_hint=(0.85, 0.5),
+            auto_dismiss=True,
+            background_color=(1, 1, 1, 1),
+            title_color=(0.9, 0.2, 0.2, 1),
+            title_align="center"
+        )
+        btn_close.bind(on_release=popup.dismiss)
+        popup.open()
+
+class HistoryScreen(Screen):
+    def on_enter(self):
+        self.ids.history_container.clear_widgets()
+        child_id = App.get_running_app().active_child_id
+        try:
+            res = requests.get(f"{BACKEND_URL}/products/child/{child_id}", timeout=5)
+            if res.status_code == 200:
+                products = res.json()
+                from kivy.graphics import Color, RoundedRectangle
+                for prod in reversed(products):
+                    # Formatage du texte : Nom en gras, marque en plus petit dessous
+                    btn_text = f"[b]{prod['name']}[/b]\n[size=13sp]{prod.get('brand', 'Marque inconnue')}[/size]"
+                    
+                    btn = Button(
+                        text=btn_text,
+                        markup=True,
+                        size_hint_y=None,
+                        height='75dp',
+                        background_color=(0,0,0,0),
+                        color=(0.1, 0.1, 0.1, 1),
+                        halign='center',
+                        valign='middle'
+                    )
+                    btn.bind(size=btn.setter('text_size')) # Pour l'alignement du texte
+                    
+                    with btn.canvas.before:
+                        Color(1, 1, 1, 0.9)
+                        btn.rect = RoundedRectangle(pos=btn.pos, size=btn.size, radius=[15,])
+                    
+                    btn.bind(pos=self.update_rect, size=self.update_rect)
+                    
+                    # Clic sur le produit -> relance l'analyse et va aux détails
+                    btn.bind(on_release=lambda x, b=prod['barcode']: self.load_product_details(b))
+                    
+                    self.ids.history_container.add_widget(btn)
+        except Exception:
+            pass
+
+    def update_rect(self, instance, value):
+        instance.rect.pos = instance.pos
+        instance.rect.size = instance.size
+
+    def load_product_details(self, barcode):
+        # On utilise la fonction existante pour récupérer les données OpenFoodFacts
+        App.get_running_app().save_to_backend(barcode)
+        self.manager.current = "details"
+
+class WindowManager(ScreenManager):
+    pass
 
 class PandooApp(App):
     product_name = StringProperty("Chargement...")
     nutrition_info = StringProperty("")
     pandoo_advice = StringProperty("Analyse en cours...")
+    product_allergens = StringProperty("Aucun")
     status_text = StringProperty("Scannez un produit")
     user_id = 0 
     active_child_id = 1
+
+    # Dictionnaire pour le filtrage français
+    TRANSLATIONS = {
+        "Milk": "Lait",
+        "Nuts": "Noisettes",
+        "Eggs": "Œufs",
+        "Peanuts": "Arachides",
+        "Soybeans": "Soja",
+        "Wheat": "Blé",
+        "Hazelnuts": "Noisettes"
+    }
 
     def open_google_search(self):
         query = self.product_name.replace("\n", " ").replace(" ", "+")
@@ -726,6 +884,33 @@ class PandooApp(App):
                     n = p.get("nutriments", {})
                     
                     self.product_name = p.get('product_name', 'Produit inconnu')
+                    
+                    # RÉCUPÉRATION ET NETTOYAGE DES ALLERGÈNES
+                    all_text = p.get('allergens_from_ingredients', '')
+                    if not all_text:
+                        all_text = p.get('allergens', '')
+                    
+                    raw_items = all_text.replace("en:", "").replace("fr:", "").split(",")
+                    clean_list = []
+                    
+                    for item in raw_items:
+                        name = item.strip().capitalize()
+                        if not name: continue
+                        translated = self.TRANSLATIONS.get(name, name)
+                        if translated not in clean_list:
+                            clean_list.append(translated)
+
+                    final_allergens = []
+                    for a in clean_list:
+                        if a == "Nuts" and "Noisettes" in clean_list: continue
+                        if a == "Milk" and "Lait" in clean_list: continue
+                        final_allergens.append(a)
+
+                    if final_allergens:
+                        self.product_allergens = ", ".join(sorted(final_allergens))
+                    else:
+                        self.product_allergens = "Aucun allergène détecté"
+
                     val_kcal = int(n.get('energy-kcal_100g', 0))
                     val_sucre = round(float(n.get('sugars_100g', 0)), 2)
                     val_sel = round(float(n.get('salt_100g', 0)), 2)
@@ -774,17 +959,16 @@ class PandooApp(App):
                         "calcium": val_calcium
                     }
                     
-                    res_backend = requests.post(
+                    requests.post(
                         f"{BACKEND_URL}/products/?id_child={self.active_child_id}", 
                         json=product_data, 
                         timeout=5
                     )
-
-        except Exception as e:
-            print(f"Erreur API : {e}")
+        except Exception:
             self.pandoo_advice = "Erreur de connexion."
 
-    def build(self): return WindowManager()
+    def build(self):
+        return WindowManager()
 
 if __name__ == '__main__':
     PandooApp().run()
