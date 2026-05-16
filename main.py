@@ -902,28 +902,42 @@ class PandooApp(App):
                     val_prot = round(float(n.get('proteins_100g', 0)), 2)
                     val_calcium = round(float(n.get('calcium_100g', 0)), 3)
 
-                    def get_c(v, s_e, s_o):
-                        if v <= s_e: return "22cc22" # Vert
-                        if v <= s_o: return "ff9900" # Orange
-                        return "ff3333" # Rouge
+                    # Fonction de couleur universelle
+                    def get_c(v, s_e, s_o, reverse=False):
+                        if not reverse:
+                            if v <= s_e: return "22cc22" # Vert
+                            if v <= s_o: return "ff9900" # Orange
+                            return "ff3333" # Rouge
+                        else:
+                            # Pour Protéines et Fibres : plus il y en a, mieux c'est
+                            if v >= s_e: return "22cc22" # Vert
+                            if v >= s_o: return "ff9900" # Orange
+                            return "ff3333" # Rouge
 
-                    # Définition des seuils pour le sucre et le sel
-                    # Un produit est "rouge" au dessus de s_o
+                    # Seuils critiques pour l'alerte
                     seuil_sucre_rouge = 13.5
                     seuil_sel_rouge = 0.9
 
+                    # Application des couleurs sur tous les nutriments
                     c_suc = get_c(val_sucre, 5.0, seuil_sucre_rouge)
                     c_sel = get_c(val_sel, 0.3, seuil_sel_rouge)
-                    c_lip = get_c(val_lip, 20.0, 35.0)
+                    c_lip = get_c(val_lip, 3.0, 20.0)
+                    c_glu = get_c(val_glu, 30.0, 50.0)
+                    # Nutriments positifs (reverse=True)
+                    c_prot = get_c(val_prot, 8.0, 4.0, reverse=True)
+                    c_fib  = get_c(val_fib, 5.0, 2.5, reverse=True)
 
                     # --- LOGIQUE D'ALERTE PRIORITAIRE ---
                     if val_sucre > seuil_sucre_rouge and val_sel > seuil_sel_rouge:
-                        self.pandoo_advice = "[color=22cc22]• Ce produit est beaucoup trop riche en sucre ET en sel ![/color]"
+                        self.pandoo_advice = "[color=ff3333]• Ce produit est beaucoup trop riche en sucre ET en sel ![/color]"
                     elif val_sucre > seuil_sucre_rouge:
-                        self.pandoo_advice = "[color=22cc22]• Dans un fruit, le sucre vient avec plein de vitamines pour te rendre fort. C'est le sucre champion, bien plus malin que celui des gâteaux ![/color]"
+                        self.pandoo_advice = "[color=ff3333]• Dans un fruit, le sucre vient avec plein de vitamines pour te rendre fort. C'est le sucre champion, bien plus malin que celui des gâteaux ![/color]"
                     elif val_sel > seuil_sel_rouge:
-                        self.pandoo_advice = "[color=22cc22]• Manger moins de sel, c'est le secret pour chouchouter ton petit cœur et le garder en pleine forme ![/color]"
-                    # Si aucune alerte rouge, on passe aux messages positifs/neutres
+                        self.pandoo_advice = "[color=ff3333]• Manger moins de sel, c'est le secret pour chouchouter ton petit cœur et le garder en pleine forme ![/color]"
+                    # Alertes secondaires (manque de nutriments essentiels)
+                    elif val_fib < 2.5:
+                        self.pandoo_advice = "[color=ff9900]• Ce produit manque de fibres, elles sont pourtant les amies de ton ventre ![/color]"
+                    # Messages positifs
                     elif val_calcium > 0.12:
                         self.pandoo_advice = "[color=22cc22]• Indispensable pour grandir et renforcer tes os.[/color]"
                     elif val_prot > 8.0:
@@ -935,8 +949,8 @@ class PandooApp(App):
                         f"[b]Valeurs pour 100g :[/b]\n"
                         f"Énergie : {val_kcal} kcal\n"
                         f"Sucres : [color={c_suc}]{val_sucre:.2f}g[/color]  |  Sel : [color={c_sel}]{val_sel:.2f}g[/color]\n"
-                        f"Lipides : [color={c_lip}]{val_lip:.2f}g[/color]  |  [color=3498db]Protéines : {val_prot:.2f}g[/color]\n"
-                        f"[color=e67e22]Glucides : {val_glu:.2f}g[/color]  |  [color=9b59b6]Fibres : {val_fib:.2f}g[/color]"
+                        f"Lipides : [color={c_lip}]{val_lip:.2f}g[/color]  |  Protéines : [color={c_prot}]{val_prot:.2f}g[/color]\n"
+                        f"Glucides : [color={c_glu}]{val_glu:.2f}g[/color]  |  Fibres : [color={c_fib}]{val_fib:.2f}g[/color]"
                     )
                     
                     product_data = {
