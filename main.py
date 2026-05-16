@@ -677,31 +677,29 @@ class AddChildScreen(Screen):
         parent_id = App.get_running_app().user_id
         
         normalized_birthdate = self.normalize_date(raw_date)
+        # Calcul de l'âge pour le backend car il semble le rendre obligatoire (Erreur 422)
+        age_val = App.get_running_app().calculate_age(normalized_birthdate)
         
         if name and normalized_birthdate and parent_id != 0:
             try:
-                # ON SUPPRIME LE CHAMP "age" car il n'existe pas dans ton modèle SQLAlchemy
                 payload = {
                     "name": str(name),
                     "birthdate": str(normalized_birthdate),
-                    "id_parent": int(parent_id)
+                    "id_parent": int(parent_id),
+                    "age": int(age_val) # On rajoute l'âge pour éviter l'erreur 422
                 }
                 
-                print(f"Tentative d'envoi sans le champ age : {payload}")
                 res = requests.post(f"{BACKEND_URL}/children/", json=payload, timeout=5)
                 
                 if res.status_code in [200, 201]:
-                    print("Pandoo créé avec succès !")
                     self.ids.child_name.ids.ti.text = ""
                     self.ids.child_birthdate.ids.ti.text = ""
-                    # Rafraîchir la liste ou changer d'écran
                     if not more:
                         self.manager.current = "child_list"
                 else:
                     print(f"Erreur {res.status_code}: {res.text}")
-                    
             except Exception as e:
-                print(f"Erreur de connexion : {e}")
+                print(f"Erreur : {e}")
 
 class ChildListScreen(Screen):
     def on_enter(self):
@@ -894,7 +892,8 @@ class PandooApp(App):
                     else:
                         self.product_allergens = "Aucun allergène détecté"
 
-                    val_kcal = int(n.get('energy-kcal_100g', 0))
+                    # Conversion en float/int pour correspondre aux types du backend
+                    val_kcal = float(n.get('energy-kcal_100g', 0))
                     val_sucre = round(float(n.get('sugars_100g', 0)), 2)
                     val_sel = round(float(n.get('salt_100g', 0)), 2)
                     val_lip = round(float(n.get('fat_100g', 0)), 2)
@@ -904,18 +903,31 @@ class PandooApp(App):
                     val_calcium = round(float(n.get('calcium_100g', 0)), 3)
 
                     def get_c(v, s_e, s_o):
-                        if v <= s_e: return "22cc22"
-                        if v <= s_o: return "ff9900"
-                        return "ff3333"
+                        if v <= s_e: return "22cc22" # Vert
+                        if v <= s_o: return "ff9900" # Orange
+                        return "ff3333" # Rouge
 
-                    c_suc = get_c(val_sucre, 5.0, 13.5)
-                    c_sel = get_c(val_sel, 0.3, 0.9)
+                    # Définition des seuils pour le sucre et le sel
+                    # Un produit est "rouge" au dessus de s_o
+                    seuil_sucre_rouge = 13.5
+                    seuil_sel_rouge = 0.9
+
+                    c_suc = get_c(val_sucre, 5.0, seuil_sucre_rouge)
+                    c_sel = get_c(val_sel, 0.3, seuil_sel_rouge)
                     c_lip = get_c(val_lip, 20.0, 35.0)
 
-                    if val_sucre > 15.0:
-                        self.pandoo_advice = "[color=ff3333]• Le sucre fatigue ton corps, choisis plutôt un fruit ![/color]"
+                    # --- LOGIQUE D'ALERTE PRIORITAIRE ---
+                    if val_sucre > seuil_sucre_rouge and val_sel > seuil_sel_rouge:
+                        self.pandoo_advice = "[color=22cc22]• Ce produit est beaucoup trop riche en sucre ET en sel ![/color]"
+                    elif val_sucre > seuil_sucre_rouge:
+                        self.pandoo_advice = "[color=22cc22]• Dans un fruit, le sucre vient avec plein de vitamines pour te rendre fort. C'est le sucre champion, bien plus malin que celui des gâteaux ![/color]"
+                    elif val_sel > seuil_sel_rouge:
+                        self.pandoo_advice = "[color=22cc22]• Manger moins de sel, c'est le secret pour chouchouter ton petit cœur et le garder en pleine forme ![/color]"
+                    # Si aucune alerte rouge, on passe aux messages positifs/neutres
                     elif val_calcium > 0.12:
                         self.pandoo_advice = "[color=22cc22]• Indispensable pour grandir et renforcer tes os.[/color]"
+                    elif val_prot > 8.0:
+                        self.pandoo_advice = "[color=22cc22]• Une bonne source de protéines pour tes muscles ![/color]"
                     else:
                         self.pandoo_advice = "[color=22cc22]Ce produit semble équilibré pour petit Pandoo ![/color]"
 
@@ -928,18 +940,18 @@ class PandooApp(App):
                     )
                     
                     product_data = {
-                        "barcode": str(code),
-                        "name": self.product_name,
-                        "brand": p.get('brands', 'Marque inconnue'),
-                        "type": p.get('categories', 'Aliment'),
-                        "calories": val_kcal,
-                        "proteins": val_prot,
-                        "glucides": val_glu,
-                        "lipids": val_lip,
-                        "salt": val_sel,
-                        "sugars": val_sucre,
-                        "fibers": val_fib,
-                        "calcium": val_calcium
+                        "barcode": int(code),
+                        "name": str(self.product_name),
+                        "brand": str(p.get('brands', 'Marque inconnue')),
+                        "type": str(p.get('categories', 'Aliment')),
+                        "calories": float(val_kcal),
+                        "glucides": float(val_glu),
+                        "calcium": float(val_calcium),
+                        "proteins": float(val_prot),
+                        "lipids": float(val_lip),
+                        "salt": float(val_sel),
+                        "sugars": float(val_sucre),
+                        "fibers": float(val_fib)
                     }
                     
                     requests.post(
