@@ -405,6 +405,8 @@ Builder.load_string('''
             color: (0.15, 0.75, 0.5, 1)
             bold: True
             font_size: '18sp'
+        
+        # Bouton Retour au Verdict (Dernier Scan)
         AnchorLayout:
             anchor_x: 'left'
             anchor_y: 'top'
@@ -419,6 +421,26 @@ Builder.load_string('''
                 canvas.before:
                     Color:
                         rgba: (0.15, 0.75, 0.5, 0.7)
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [15,]
+
+        # NOUVEAU BOUTON : Retour à la liste des Pandoos
+        AnchorLayout:
+            anchor_x: 'right'
+            anchor_y: 'top'
+            padding: [20, 20]
+            Button:
+                text: "Mes Pandoos"
+                size_hint: None, None
+                size: '130dp', '45dp'
+                background_color: (0,0,0,0)
+                bold: True
+                on_release: root.manager.current = "child_list"
+                canvas.before:
+                    Color:
+                        rgba: (0.2, 0.2, 0.2, 0.7)
                     RoundedRectangle:
                         pos: self.pos
                         size: self.size
