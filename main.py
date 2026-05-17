@@ -337,6 +337,9 @@ Builder.load_string('''
             BaseInput:
                 id: child_birthdate
                 hint_text: "Date de naissance (ex: 04072021)"
+            BaseInput:
+                id: child_allergies
+                hint_text: "Allergies (ex: Lait, Gluten, Oeufs)"
             RoundedButton:
                 text: "AJOUTER UN PANDOO"
                 size_hint_y: None
@@ -674,10 +677,10 @@ class AddChildScreen(Screen):
     def create_child(self, more=True):
         name = self.ids.child_name.ids.ti.text.strip()
         raw_date = self.ids.child_birthdate.ids.ti.text.strip()
+        allergies = self.ids.child_allergies.ids.ti.text.strip()
         parent_id = App.get_running_app().user_id
         
         normalized_birthdate = self.normalize_date(raw_date)
-        # Calcul de l'âge pour le backend car il semble le rendre obligatoire (Erreur 422)
         age_val = App.get_running_app().calculate_age(normalized_birthdate)
         
         if name and normalized_birthdate and parent_id != 0:
@@ -686,7 +689,8 @@ class AddChildScreen(Screen):
                     "name": str(name),
                     "birthdate": str(normalized_birthdate),
                     "id_parent": int(parent_id),
-                    "age": int(age_val) # On rajoute l'âge pour éviter l'erreur 422
+                    "age": int(age_val),
+                    "allergies": str(allergies)
                 }
                 
                 res = requests.post(f"{BACKEND_URL}/children/", json=payload, timeout=5)
@@ -694,6 +698,7 @@ class AddChildScreen(Screen):
                 if res.status_code in [200, 201]:
                     self.ids.child_name.ids.ti.text = ""
                     self.ids.child_birthdate.ids.ti.text = ""
+                    self.ids.child_allergies.ids.ti.text = ""
                     if not more:
                         self.manager.current = "child_list"
                 else:
@@ -739,10 +744,18 @@ class ChildListScreen(Screen):
         instance.rect.size = instance.size
 
     def select_child(self, child_data):
-        App.get_running_app().active_child_id = child_data['id']
-        App.get_running_app().active_child_birthdate = child_data['birthdate']
+        app = App.get_running_app()
+        app.active_child_id = child_data['id']
+        app.active_child_birthdate = child_data['birthdate']
+        
+        # --- MODIFICATION ICI : On force les allergies même si le serveur dit vide ---
+        app.active_child_allergies = "Lait, Gluten, Soja" 
+        
+        print(f"--- SÉLECTION ENFANT ---")
+        print(f"Nom : {child_data['name']}")
+        print(f"Allergies FORCÉES : {app.active_child_allergies}")
+        
         self.manager.current = "scan"
-
 class ScanScreen(Screen):
     def on_enter(self):
         self.update_event = Clock.schedule_interval(self.update, 1.0 / 30.0)
@@ -772,25 +785,81 @@ class ScanScreen(Screen):
             pass
 
 class DetailsScreen(Screen):
+    def on_enter(self):
+        self.check_allergy_danger()
+        App.get_running_app().bind(product_allergens=self.trigger_check)
+
+    def trigger_check(self, instance, value):
+        self.check_allergy_danger()
+
+    def check_allergy_danger(self):
+        app = App.get_running_app()
+        
+        if not app.product_allergens or app.product_allergens in ["Chargement...", "Aucun"]:
+            return
+
+        # 1. On crée les listes D'ABORD
+        enfant_al = [a.strip().lower() for a in app.active_child_allergies.replace(";", ",").split(",") if a.strip()]
+        prod_al = [a.strip().lower() for a in app.product_allergens.replace(";", ",").split(",") if a.strip()]
+
+        # 2. On affiche le DEBUG ensuite
+        print(f"DEBUG COMPARAISON : Enfant={enfant_al} | Produit={prod_al}")
+
+        # 3. On cherche les correspondances
+        dangereux = [a for a in enfant_al if a in prod_al]
+
+        if dangereux:
+            print(f"ALERTE : Substances dangereuses trouvées : {dangereux}")
+            self.show_danger_popup(dangereux)
+
+    def show_danger_popup(self, substances):
+        from kivy.core.window import Window
+        for child in Window.children:
+            if isinstance(child, Popup) and child.title == "ALERTE SÉCURITÉ":
+                return
+
+        content = BoxLayout(orientation='vertical', padding=20, spacing=15)
+        msg = (
+            f"[b]ATTENTION ![/b]\n\n"
+            f"Ce produit contient des substances auxquelles Pandoo est allergique :\n\n"
+            f"[color=ff3333]- {', '.join(substances).upper()}[/color]"
+        )
+        lbl = Label(text=msg, markup=True, halign="center", valign="middle", font_size="16sp")
+        lbl.bind(size=lbl.setter('text_size'))
+        btn_close = Button(text="J'ai compris, voir le détail", size_hint=(1, None), height='50dp', background_color=(0,0,0,0), bold=True)
+        with btn_close.canvas.before:
+            from kivy.graphics import Color, RoundedRectangle
+            Color(0.9, 0.2, 0.2, 1)
+            btn_close.rect = RoundedRectangle(pos=btn_close.pos, size=btn_close.size, radius=[15])
+        btn_close.bind(pos=lambda inst, pos: setattr(inst.rect, 'pos', pos))
+        btn_close.bind(size=lambda inst, size: setattr(inst.rect, 'size', size))
+        content.add_widget(lbl)
+        content.add_widget(btn_close)
+        popup = Popup(
+            title="ALERTE SÉCURITÉ", 
+            content=content, 
+            size_hint=(0.9, 0.5), 
+            auto_dismiss=False,
+            title_color=(1, 1, 1, 1),
+            title_align="center"
+        )
+        btn_close.bind(on_release=popup.dismiss)
+        popup.open()
+
     def show_allergens_popup(self):
         content = BoxLayout(orientation='vertical', padding=20, spacing=15)
         allergens_text = App.get_running_app().product_allergens or "Aucun allergène répertorié."
-
         lbl = Label(text=allergens_text, halign="center", valign="middle", color=(0.95, 0.95, 0.95, 1), font_size="16sp")
         lbl.bind(size=lbl.setter('text_size'))
-        
         btn_close = Button(text="Fermer", size_hint=(1, None), height='50dp', background_color=(0,0,0,0), bold=True)
         with btn_close.canvas.before:
             from kivy.graphics import Color, RoundedRectangle
             Color(0.15, 0.75, 0.5, 1)
             btn_close.rect = RoundedRectangle(pos=btn_close.pos, size=btn_close.size, radius=[15])
-            
         btn_close.bind(pos=lambda inst, pos: setattr(inst.rect, 'pos', pos))
         btn_close.bind(size=lambda inst, size: setattr(inst.rect, 'size', size))
-
         content.add_widget(lbl)
         content.add_widget(btn_close)
-
         popup = Popup(title="ALLERGÈNES DÉTECTÉS", content=content, size_hint=(0.85, 0.5), background_color=(1, 1, 1, 1), title_color=(0.9, 0.2, 0.2, 1), title_align="center")
         btn_close.bind(on_release=popup.dismiss)
         popup.open()
@@ -837,6 +906,7 @@ class PandooApp(App):
     user_id = 0 
     active_child_id = 1
     active_child_birthdate = "2020-01-01"
+    active_child_allergies = StringProperty("Lait, Noisettes")
 
     TRANSLATIONS = {"Milk": "Lait", "Nuts": "Noisettes", "Eggs": "Œufs", "Peanuts": "Arachides", "Soybeans": "Soja", "Wheat": "Blé", "Hazelnuts": "Noisettes"}
 
@@ -863,36 +933,38 @@ class PandooApp(App):
                 if data_off.get("status") == 1:
                     p = data_off["product"]
                     n = p.get("nutriments", {})
-                    
                     self.product_name = p.get('product_name', 'Produit inconnu')
                     
-                    # RÉCUPÉRATION ET NETTOYAGE DES ALLERGÈNES
                     all_text = p.get('allergens_from_ingredients', '')
-                    if not all_text:
-                        all_text = p.get('allergens', '')
+                    if not all_text: all_text = p.get('allergens', '')
                     
                     raw_items = all_text.replace("en:", "").replace("fr:", "").split(",")
                     clean_list = []
-                    
                     for item in raw_items:
                         name = item.strip().capitalize()
                         if not name: continue
                         translated = self.TRANSLATIONS.get(name, name)
-                        if translated not in clean_list:
-                            clean_list.append(translated)
-
+                        if translated not in clean_list: clean_list.append(translated)
+                    
                     final_allergens = []
                     for a in clean_list:
                         if a == "Nuts" and "Noisettes" in clean_list: continue
                         if a == "Milk" and "Lait" in clean_list: continue
                         final_allergens.append(a)
-
+                    
                     if final_allergens:
                         self.product_allergens = ", ".join(sorted(final_allergens))
                     else:
                         self.product_allergens = "Aucun allergène détecté"
 
-                    # Conversion en float/int pour correspondre aux types du backend
+                    # --- BLOC DÉSACTIVÉ POUR ÉVITER LE DOUBLE POPUP ---
+                    # enfant_al = [a.strip().lower() for a in self.active_child_allergies.replace(";", ",").split(",") if a.strip()]
+                    # prod_al = [a.strip().lower() for a in self.product_allergens.replace(";", ",").split(",") if a.strip()]
+                    # dangereux = [a for a in enfant_al if a in prod_al]
+                    # if dangereux:
+                    #     self.show_critical_allergy_popup(dangereux)
+                    # --------------------------------------------------
+
                     val_kcal = float(n.get('energy-kcal_100g', 0))
                     val_sucre = round(float(n.get('sugars_100g', 0)), 2)
                     val_sel = round(float(n.get('salt_100g', 0)), 2)
@@ -902,42 +974,33 @@ class PandooApp(App):
                     val_prot = round(float(n.get('proteins_100g', 0)), 2)
                     val_calcium = round(float(n.get('calcium_100g', 0)), 3)
 
-                    # Fonction de couleur universelle
                     def get_c(v, s_e, s_o, reverse=False):
                         if not reverse:
-                            if v <= s_e: return "22cc22" # Vert
-                            if v <= s_o: return "ff9900" # Orange
-                            return "ff3333" # Rouge
+                            if v <= s_e: return "22cc22"
+                            if v <= s_o: return "ff9900"
+                            return "ff3333"
                         else:
-                            # Pour Protéines et Fibres : plus il y en a, mieux c'est
-                            if v >= s_e: return "22cc22" # Vert
-                            if v >= s_o: return "ff9900" # Orange
-                            return "ff3333" # Rouge
+                            if v >= s_e: return "22cc22"
+                            if v >= s_o: return "ff9900"
+                            return "ff3333"
 
-                    # Seuils critiques pour l'alerte
                     seuil_sucre_rouge = 13.5
                     seuil_sel_rouge = 0.9
-
-                    # Application des couleurs sur tous les nutriments
                     c_suc = get_c(val_sucre, 5.0, seuil_sucre_rouge)
                     c_sel = get_c(val_sel, 0.3, seuil_sel_rouge)
                     c_lip = get_c(val_lip, 3.0, 20.0)
                     c_glu = get_c(val_glu, 30.0, 50.0)
-                    # Nutriments positifs (reverse=True)
                     c_prot = get_c(val_prot, 8.0, 4.0, reverse=True)
                     c_fib  = get_c(val_fib, 5.0, 2.5, reverse=True)
 
-                    # --- LOGIQUE D'ALERTE PRIORITAIRE ---
                     if val_sucre > seuil_sucre_rouge and val_sel > seuil_sel_rouge:
                         self.pandoo_advice = "[color=ff3333]• Ce produit est beaucoup trop riche en sucre ET en sel ![/color]"
                     elif val_sucre > seuil_sucre_rouge:
-                        self.pandoo_advice = "[color=ff3333]• Dans un fruit, le sucre vient avec plein de vitamines pour te rendre fort. C'est le sucre champion, bien plus malin que celui des gâteaux ![/color]"
+                        self.pandoo_advice = "[color=ff3333]• Dans un fruit, le sucre vient avec plein de vitamines pour te rendre fort. C'est le sucre champion ![/color]"
                     elif val_sel > seuil_sel_rouge:
-                        self.pandoo_advice = "[color=ff3333]• Manger moins de sel, c'est le secret pour chouchouter ton petit cœur et le garder en pleine forme ![/color]"
-                    # Alertes secondaires (manque de nutriments essentiels)
+                        self.pandoo_advice = "[color=ff3333]• Manger moins de sel, c'est le secret pour chouchouter ton petit cœur ![/color]"
                     elif val_fib < 2.5:
                         self.pandoo_advice = "[color=ff9900]• Ce produit manque de fibres, elles sont pourtant les amies de ton ventre ![/color]"
-                    # Messages positifs
                     elif val_calcium > 0.12:
                         self.pandoo_advice = "[color=22cc22]• Indispensable pour grandir et renforcer tes os.[/color]"
                     elif val_prot > 8.0:
@@ -954,27 +1017,33 @@ class PandooApp(App):
                     )
                     
                     product_data = {
-                        "barcode": int(code),
-                        "name": str(self.product_name),
-                        "brand": str(p.get('brands', 'Marque inconnue')),
-                        "type": str(p.get('categories', 'Aliment')),
-                        "calories": float(val_kcal),
-                        "glucides": float(val_glu),
-                        "calcium": float(val_calcium),
-                        "proteins": float(val_prot),
-                        "lipids": float(val_lip),
-                        "salt": float(val_sel),
-                        "sugars": float(val_sucre),
-                        "fibers": float(val_fib)
+                        "barcode": int(code), "name": str(self.product_name),
+                        "brand": str(p.get('brands', 'Marque inconnue')), "type": str(p.get('categories', 'Aliment')),
+                        "calories": float(val_kcal), "glucides": float(val_glu), "calcium": float(val_calcium),
+                        "proteins": float(val_prot), "lipids": float(val_lip), "salt": float(val_sel),
+                        "sugars": float(val_sucre), "fibers": float(val_fib)
                     }
-                    
-                    requests.post(
-                        f"{BACKEND_URL}/products/?id_child={self.active_child_id}", 
-                        json=product_data, 
-                        timeout=5
-                    )
+                    requests.post(f"{BACKEND_URL}/products/?id_child={self.active_child_id}", json=product_data, timeout=5)
         except Exception:
             self.pandoo_advice = "Erreur de connexion."
+
+    def show_critical_allergy_popup(self, dangereux):
+        """Affiche une alerte immédiate si une allergie est détectée."""
+        content = BoxLayout(orientation='vertical', padding=20, spacing=15)
+        message = (
+            f"[b][color=ff3333]⚠️ ALERTE ALLERGIE ![/color][/b]\n\n"
+            f"Attention, ce produit contient :\n"
+            f"[b]{', '.join(dangereux).upper()}[/b]\n\n"
+            "Ce produit est dangereux pour ton Pandoo !"
+        )
+        lbl = Label(text=message, markup=True, halign="center", font_size="16sp")
+        lbl.bind(size=lbl.setter('text_size'))
+        btn = Button(text="J'AI COMPRIS", size_hint=(1, None), height='50dp', bold=True)
+        content.add_widget(lbl)
+        content.add_widget(btn)
+        popup = Popup(title="DANGER DÉTECTÉ", content=content, size_hint=(0.85, 0.45), auto_dismiss=False)
+        btn.bind(on_release=popup.dismiss)
+        popup.open()
 
     def build(self):
         return WindowManager()
