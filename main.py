@@ -28,7 +28,7 @@ from kivy.uix.button import Button
 from kivy.uix.scrollview import ScrollView
 
 # --- CONFIGURATION RÉSEAU ---
-URL_IMAGE = "http://192.168.1.157:8080/shot.jpg" 
+URL_IMAGE = "http://10.0.7.196:8080/shot.jpg" 
 BACKEND_URL = "http://127.0.0.1:8000"
 
 Builder.load_string('''
@@ -560,7 +560,7 @@ Builder.load_string('''
                 size_hint_y: None
                 height: '60dp'
                 BackButton:
-                    on_release: root.manager.current = "details"
+                    on_release: root.manager.current = "child_list"
             Label:
                 text: "HISTORIQUE"
                 font_size: '28sp'
@@ -574,6 +574,13 @@ Builder.load_string('''
                     size_hint_y: None
                     height: self.minimum_height
                     spacing: 12
+            
+            # --- BOUTON SCANNER AJOUTÉ EN BAS ---
+            RoundedButton:
+                text: "SCANNER UN PRODUIT"
+                size_hint_y: None
+                height: '60dp'
+                on_release: root.manager.current = "scan"
 ''')
 
 class BackButton(ButtonBehavior, BoxLayout):
@@ -715,18 +722,27 @@ class AddChildScreen(Screen):
                     "allergies": str(allergies)
                 }
                 
+                # --- DEBUG : Vérification avant envoi ---
+                print(f"--- TENTATIVE CRÉATION PANDOO ---")
+                print(f"Données envoyées au serveur : {payload}")
+                
                 res = requests.post(f"{BACKEND_URL}/children/", json=payload, timeout=5)
                 
                 if res.status_code in [200, 201]:
+                    # --- DEBUG : Vérification du stockage réel sur le serveur ---
+                    serveur_data = res.json()
+                    print(f"Succès ! Le serveur a bien enregistré : {serveur_data}")
+                    
                     self.ids.child_name.ids.ti.text = ""
                     self.ids.child_birthdate.ids.ti.text = ""
                     self.ids.child_allergies.ids.ti.text = ""
+                    
                     if not more:
                         self.manager.current = "child_list"
                 else:
                     print(f"Erreur {res.status_code}: {res.text}")
             except Exception as e:
-                print(f"Erreur : {e}")
+                print(f"Erreur lors de la requête : {e}")
 
 class ChildListScreen(Screen):
     def on_enter(self):
@@ -765,19 +781,30 @@ class ChildListScreen(Screen):
         instance.rect.pos = instance.pos
         instance.rect.size = instance.size
 
+    # Dans ChildListScreen
     def select_child(self, child_data):
         app = App.get_running_app()
         app.active_child_id = child_data['id']
         app.active_child_birthdate = child_data['birthdate']
         
-        # --- MODIFICATION ICI : On force les allergies même si le serveur dit vide ---
-        app.active_child_allergies = "Lait, Gluten, Soja" 
+        # 1. On affiche TOUT ce que le serveur a envoyé pour débusquer le nom de la clé
+        print(f"DEBUG COMPLET SERVEUR POUR {child_data.get('name')}: {child_data}")
+
+        # 2. On essaie de récupérer les allergies avec plusieurs clés possibles
+        # On cherche 'allergies' OU 'allergen' OU 'allergene'
+        allergies = child_data.get('allergies') or child_data.get('allergen') or child_data.get('allergene') or ""
         
+        # 3. On stocke le résultat (en s'assurant que c'est du texte)
+        # Note : Le mode test pour Emy est supprimé pour laisser place aux données du backend
+        app.active_child_allergies = str(allergies).strip()
+
+        # 4. Log de contrôle
         print(f"--- SÉLECTION ENFANT ---")
-        print(f"Nom : {child_data['name']}")
-        print(f"Allergies FORCÉES : {app.active_child_allergies}")
-        
-        self.manager.current = "scan"
+        print(f"Nom : {child_data.get('name')}")
+        print(f"Allergies stockées en mémoire : '{app.active_child_allergies}'")
+
+        self.manager.current = "history"
+
 class ScanScreen(Screen):
     def on_enter(self):
         self.update_event = Clock.schedule_interval(self.update, 1.0 / 30.0)
@@ -817,22 +844,38 @@ class DetailsScreen(Screen):
     def check_allergy_danger(self):
         app = App.get_running_app()
         
+        # 1. Sécurité : On vérifie si les données sont présentes
         if not app.product_allergens or app.product_allergens in ["Chargement...", "Aucun"]:
+            print("DEBUG : Arrêt car product_allergens est vide ou en chargement")
             return
 
-        # 1. On crée les listes D'ABORD
+        # 2. On prépare les listes (nettoyage des espaces et minuscules)
+        # On traite app.active_child_allergies qui vient du profil de l'enfant
         enfant_al = [a.strip().lower() for a in app.active_child_allergies.replace(";", ",").split(",") if a.strip()]
+        
+        # On traite app.product_allergens qui vient d'OpenFoodFacts
         prod_al = [a.strip().lower() for a in app.product_allergens.replace(";", ",").split(",") if a.strip()]
 
-        # 2. On affiche le DEBUG ensuite
-        print(f"DEBUG COMPARAISON : Enfant={enfant_al} | Produit={prod_al}")
+        # 3. DEBUG CRUCIAL : Regarde bien ces lignes dans ta console
+        print(f"DEBUG COMPARAISON")
+        print(f" -> Liste Enfant : {enfant_al}")
+        print(f" -> Liste Produit : {prod_al}")
 
-        # 3. On cherche les correspondances
+        # 4. Sécurité : Si l'enfant n'a aucune allergie, on ne compare rien
+        if not enfant_al:
+            print("DEBUG : L'enfant n'a aucune allergie listée.")
+            return
+
+        # 5. On cherche les correspondances exactes
         dangereux = [a for a in enfant_al if a in prod_al]
+        print(f" -> Résultat (Substances trouvées) : {dangereux}")
 
+        # 6. Déclenchement du popup uniquement s'il y a un danger
         if dangereux:
-            print(f"ALERTE : Substances dangereuses trouvées : {dangereux}")
+            print("DEBUG : Lancement du popup d'alerte !")
             self.show_danger_popup(dangereux)
+        else:
+            print("DEBUG : Aucun allergène commun trouvé.")
 
     def show_danger_popup(self, substances):
         from kivy.core.window import Window
