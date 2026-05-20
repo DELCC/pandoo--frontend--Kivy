@@ -1,0 +1,546 @@
+<EyeButton@ButtonBehavior+AnchorLayout>:
+    size_hint_x: None
+    width: '50dp'
+
+<BackgroundLayer@Image>:
+    source: 'pandoo002.png'
+    allow_stretch: True
+    keep_ratio: False
+    size_hint: (1, 1)
+    pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+    canvas.after:
+        Color:
+            rgba: (0, 0, 0, 0.2)
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
+<WindowManager>:
+    StartScreen:
+    CreateUserScreen:
+    LoginScreen:
+    AddChildScreen:
+    ChildListScreen:
+    ScanScreen:
+    DetailsScreen:
+    HistoryScreen:
+
+<BackButton@ButtonBehavior+BoxLayout>:
+    size_hint: None, None
+    size: '100dp', '40dp'
+    orientation: 'horizontal'
+    padding: ['10dp', 0]
+    canvas.before:
+        Color:
+            rgba: (0, 0, 0, 0.3)
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [15,]
+    Label:
+        text: "< Retour"
+        color: (1, 1, 1, 1)
+        font_size: '14sp'
+        bold: True
+
+<RoundedButton@Button>:
+    background_color: (0, 0, 0, 0)
+    font_size: '18sp'
+    bold: True
+    canvas.before:
+        Color:
+            rgba: (0.15, 0.75, 0.5, 0.9) if self.state == 'normal' else (0.1, 0.6, 0.4, 1)
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [25,]
+
+<BaseInput@BoxLayout>:
+    hint_text: ""
+    is_password: False
+    orientation: 'horizontal'
+    size_hint_y: None
+    height: '55dp'
+    canvas.before:
+        Color:
+            rgba: (1, 1, 1, 0.95)
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [15,]
+    TextInput:
+        id: ti
+        hint_text: root.hint_text
+        password: root.is_password
+        background_normal: ''
+        background_active: ''
+        background_color: (0,0,0,0)
+        foreground_color: (0.1, 0.1, 0.1, 1)
+        hint_text_color: (0.5, 0.5, 0.5, 1)
+        cursor_color: (0.15, 0.75, 0.5, 1)
+        padding: [20, 18, 15, 15]
+        font_size: '16sp'
+        multiline: False
+        write_tab: False
+
+<StartScreen>:
+    name: "start"
+    RelativeLayout:
+        BackgroundLayer:
+        BoxLayout:
+            orientation: 'vertical'
+            padding: [40, 80]
+            spacing: 20
+            Label:
+                text: "PANDOO"
+                font_size: '56sp'
+                bold: True
+            Widget:
+                size_hint_y: 1
+            RoundedButton:
+                text: "CONNEXION"
+                size_hint_y: None
+                height: '60dp'
+                on_release: root.manager.current = "login"
+            RoundedButton:
+                text: "CRÉER UN COMPTE"
+                size_hint_y: None
+                height: '60dp'
+                on_release: root.manager.current = "create_user"
+
+<CreateUserScreen>:
+    name: "create_user"
+    RelativeLayout:
+        BackgroundLayer:
+        BoxLayout:
+            orientation: 'vertical'
+            padding: [30, 20]
+            AnchorLayout:
+                anchor_x: 'left'
+                size_hint_y: None
+                height: '60dp'
+                BackButton:
+                    on_release: root.manager.current = "start"
+            BoxLayout:
+                orientation: 'vertical'
+                padding: [10, 15, 10, 0]
+                spacing: 12
+                Label:
+                    text: "INSCRIPTION"
+                    font_size: '28sp'
+                    bold: True
+                    size_hint_y: None
+                    height: '60dp'
+                BaseInput:
+                    id: new_user
+                    hint_text: "Nom d'utilisateur"
+                BaseInput:
+                    id: new_email
+                    hint_text: "Email"
+                BoxLayout:
+                    size_hint_y: None
+                    height: '55dp'
+                    canvas.before:
+                        Color:
+                            rgba: (1, 1, 1, 0.95)
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [15,]
+                    TextInput:
+                        id: new_pass
+                        hint_text: "Mot de passe"
+                        password: True
+                        background_normal: ''
+                        background_active: ''
+                        background_color: (0,0,0,0)
+                        foreground_color: (0.1, 0.1, 0.1, 1)
+                        hint_text_color: (0.5, 0.5, 0.5, 1)
+                        padding: [20, 18, 15, 15]
+                        font_size: '16sp'
+                        multiline: False
+                    EyeButton:
+                        on_release: new_pass.password = not new_pass.password
+                        Image:
+                            source: 'eye_off.png' if new_pass.password else 'eye_on.png'
+                            size_hint: None, None
+                            size: '22dp', '22dp'
+                            opacity: 0.6
+                
+                BoxLayout:
+                    size_hint_y: None
+                    height: '65dp' if root.error_msg else '0dp'
+                    opacity: 1 if root.error_msg else 0
+                    padding: [15, 5]
+                    canvas.before:
+                        Color:
+                            rgba: (1, 1, 1, 0.95)
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [15,]
+                    Label:
+                        text: root.error_msg
+                        color: (0.9, 0.2, 0.2, 1)
+                        font_size: '12sp'
+                        bold: True
+                        halign: 'center'
+                        valign: 'middle'
+                        text_size: self.width - 30, None
+
+                RoundedButton:
+                    text: "VALIDER"
+                    size_hint_y: None
+                    height: '60dp'
+                    on_release: root.validate_and_create()
+                Button:
+                    text: "S'INSCRIRE AVEC GOOGLE"
+                    size_hint_y: None
+                    height: '50dp'
+                    bold: True
+                    background_color: (0, 0, 0, 0)
+                    canvas.before:
+                        Color:
+                            rgba: (0.9, 0.9, 0.9, 1) if self.state == 'normal' else (0.8, 0.8, 0.8, 1)
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [25,]
+                    color: (0.2, 0.2, 0.2, 1)
+                    on_release: root.login_with_google()
+
+<LoginScreen>:
+    name: "login"
+    RelativeLayout:
+        BackgroundLayer:
+        BoxLayout:
+            orientation: 'vertical'
+            padding: [30, 20]
+            AnchorLayout:
+                anchor_x: 'left'
+                size_hint_y: None
+                height: '60dp'
+                BackButton:
+                    on_release: root.manager.current = "start"
+            BoxLayout:
+                orientation: 'vertical'
+                padding: [10, 40, 10, 40]
+                spacing: 15
+                Label:
+                    text: "CONNEXION"
+                    font_size: '36sp'
+                    bold: True
+                    size_hint_y: None
+                    height: '80dp'
+                BaseInput:
+                    id: login_user
+                    hint_text: "Utilisateur"
+                BoxLayout:
+                    size_hint_y: None
+                    height: '55dp'
+                    canvas.before:
+                        Color:
+                            rgba: (1, 1, 1, 0.95)
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [15,]
+                    TextInput:
+                        id: login_pass
+                        hint_text: "Mot de passe"
+                        password: True
+                        background_normal: ''
+                        background_active: ''
+                        background_color: (0,0,0,0)
+                        foreground_color: (0.1, 0.1, 0.1, 1)
+                        hint_text_color: (0.5, 0.5, 0.5, 1)
+                        padding: [20, 18, 15, 15]
+                        font_size: '16sp'
+                        multiline: False
+                    EyeButton:
+                        on_release: login_pass.password = not login_pass.password
+                        Image:
+                            source: 'eye_off.png' if login_pass.password else 'eye_on.png'
+                            size_hint: None, None
+                            size: '22dp', '22dp'
+                            opacity: 0.6
+                RoundedButton:
+                    text: "ENTRER"
+                    size_hint_y: None
+                    height: '60dp'
+                    on_release: root.login_user()
+                Button:
+                    text: "SE CONNECTER AVEC GOOGLE"
+                    size_hint_y: None
+                    height: '50dp'
+                    bold: True
+                    background_color: (0, 0, 0, 0)
+                    canvas.before:
+                        Color:
+                            rgba: (0.9, 0.9, 0.9, 1) if self.state == 'normal' else (0.8, 0.8, 0.8, 1)
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [25,]
+                    color: (0.2, 0.2, 0.2, 1)
+                    on_release: root.login_with_google()
+
+<AddChildScreen>:
+    name: "add_child"
+    RelativeLayout:
+        BackgroundLayer:
+        BoxLayout:
+            orientation: 'vertical'
+            padding: [40, 60]
+            spacing: 20
+            Label:
+                text: "AJOUTER UN PANDOO"
+                font_size: '28sp'
+                bold: True
+            BaseInput:
+                id: child_name
+                hint_text: "Prénom"
+            BaseInput:
+                id: child_birthdate
+                hint_text: "Date de naissance (ex: 04072021)"
+            BaseInput:
+                id: child_allergies
+                hint_text: "Allergies (ex: Lait, Gluten, Oeufs)"
+            RoundedButton:
+                text: "AJOUTER UN PANDOO"
+                size_hint_y: None
+                height: '60dp'
+                on_release: root.create_child(more=True)
+            RoundedButton:
+                text: "VOIR MES PANDOO'S"
+                size_hint_y: None
+                height: '45dp'
+                on_release: root.create_child(more=False)
+
+<ChildListScreen>:
+    name: "child_list"
+    RelativeLayout:
+        BackgroundLayer:
+        BoxLayout:
+            orientation: 'vertical'
+            padding: [30, 20]
+            spacing: 20
+            AnchorLayout:
+                anchor_x: 'left'
+                size_hint_y: None
+                height: '60dp'
+                BackButton:
+                    on_release: root.manager.current = "start"
+            Label:
+                text: "QUEL PANDOO ?"
+                font_size: '28sp'
+                bold: True
+                size_hint_y: None
+                height: '60dp'
+            ScrollView:
+                BoxLayout:
+                    id: container
+                    orientation: 'vertical'
+                    size_hint_y: None
+                    height: self.minimum_height
+                    spacing: 15
+            RoundedButton:
+                text: "+ AJOUTER UN PANDOO"
+                size_hint_y: None
+                height: '60dp'
+                on_release: root.manager.current = "add_child"
+
+<ScanScreen>:
+    name: "scan"
+    RelativeLayout:
+        Image:
+            id: camera_preview
+            size_hint: (1, 1)
+            pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+        Widget:
+            canvas.after:
+                Color:
+                    rgba: (0.15, 0.75, 0.5, 0.5)
+                Line:
+                    width: 3
+                    rounded_rectangle: (self.width*0.15, self.height*0.3, self.width*0.7, self.height*0.4, 20)
+        Label:
+            text: app.status_text
+            size_hint: (1, 0.2)
+            pos_hint: {'center_x': 0.5, 'y': 0}
+            color: (0.15, 0.75, 0.5, 1)
+            bold: True
+            font_size: '18sp'
+        
+        AnchorLayout:
+            anchor_x: 'left'
+            anchor_y: 'top'
+            padding: [20, 20]
+            Button:
+                text: "< Dernier Scan"
+                size_hint: None, None
+                size: '130dp', '45dp'
+                background_color: (0,0,0,0)
+                bold: True
+                on_release: if app.product_name != "Chargement...": root.manager.current = "details"
+                canvas.before:
+                    Color:
+                        rgba: (0.15, 0.75, 0.5, 0.7)
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [15,]
+
+        AnchorLayout:
+            anchor_x: 'right'
+            anchor_y: 'top'
+            padding: [20, 20]
+            Button:
+                text: "Mes Pandoos"
+                size_hint: None, None
+                size: '130dp', '45dp'
+                background_color: (0,0,0,0)
+                bold: True
+                on_release: root.manager.current = "child_list"
+                canvas.before:
+                    Color:
+                        rgba: (0.2, 0.2, 0.2, 0.7)
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [15,]
+
+<DetailsScreen>:
+    name: "details"
+    RelativeLayout:
+        BackgroundLayer:
+        AnchorLayout:
+            anchor_x: 'center'
+            anchor_y: 'top'
+            padding: [25, 40, 25, 0]
+            BoxLayout:
+                orientation: 'vertical'
+                size_hint: (1, None)
+                height: self.minimum_height
+                spacing: 20
+                Label:
+                    text: "LE VERDICT DE PANDOO"
+                    font_size: '26sp'
+                    bold: True
+                    color: (1, 1, 1, 1)
+                    size_hint_y: None
+                    height: '40dp'
+                BoxLayout:
+                    orientation: 'vertical'
+                    size_hint: (1, None)
+                    height: self.minimum_height
+                    padding: [15, 20]
+                    spacing: 10
+                    canvas.before:
+                        Color:
+                            rgba: (1, 1, 1, 1)
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [20]
+                    Label:
+                        text: app.product_name
+                        font_size: '18sp'
+                        bold: True
+                        color: (0.1, 0.1, 0.1, 1)
+                        size_hint_y: None
+                        height: self.texture_size[1]
+                        text_size: self.width, None
+                        halign: 'center'
+                    Label:
+                        text: app.pandoo_advice
+                        markup: True
+                        font_size: '15sp'
+                        size_hint_y: None
+                        height: self.texture_size[1]
+                        text_size: self.width, None
+                        halign: 'center'
+                    
+                    Button:
+                        text: "ALLERGÈNES"
+                        size_hint_y: None
+                        height: '40dp'
+                        bold: True
+                        background_color: (0, 0, 0, 0)
+                        color: (1, 1, 1, 1)
+                        on_release: root.show_allergens_popup()
+                        canvas.before:
+                            Color:
+                                rgba: (1, 0.5, 0, 1)
+                            RoundedRectangle:
+                                pos: self.pos
+                                size: self.size
+                                radius: [10,]
+
+                    Widget:
+                        size_hint_y: None
+                        height: '1dp'
+                        canvas:
+                            Color:
+                                rgba: (0.15, 0.75, 0.5, 0.2)
+                            Rectangle:
+                                pos: self.x + 20, self.y
+                                size: self.width - 40, self.height
+                    Label:
+                        text: app.nutrition_info
+                        markup: True
+                        font_size: '14sp'
+                        color: (0.2, 0.2, 0.2, 1)
+                        size_hint_y: None
+                        height: self.texture_size[1]
+                        text_size: self.width, None
+                        halign: 'left'
+        BoxLayout:
+            orientation: 'vertical'
+            size_hint: (0.85, None)
+            height: '170dp'
+            pos_hint: {'center_x': 0.5, 'y': 0.05}
+            spacing: 10
+            RoundedButton:
+                text: "VOIR SUR GOOGLE"
+                on_release: app.open_google_search()
+            RoundedButton:
+                text: "VOIR L'HISTORIQUE"
+                on_release: root.manager.current = "history"
+            RoundedButton:
+                text: "RETOUR AU SCANNER"
+                on_release: root.manager.current = "scan"
+
+<HistoryScreen>:
+    name: "history"
+    RelativeLayout:
+        BackgroundLayer:
+        BoxLayout:
+            orientation: 'vertical'
+            padding: [30, 20]
+            spacing: 20
+            AnchorLayout:
+                anchor_x: 'left'
+                size_hint_y: None
+                height: '60dp'
+                BackButton:
+                    on_release: root.manager.current = "child_list"
+            Label:
+                text: "HISTORIQUE"
+                font_size: '28sp'
+                bold: True
+                size_hint_y: None
+                height: '40dp'
+            ScrollView:
+                BoxLayout:
+                    id: history_container
+                    orientation: 'vertical'
+                    size_hint_y: None
+                    height: self.minimum_height
+                    spacing: 12
+            
+            RoundedButton:
+                text: "SCANNER UN PRODUIT"
+                size_hint_y: None
+                height: '60dp'
+                on_release: root.manager.current = "scan"
