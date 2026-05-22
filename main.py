@@ -10,7 +10,7 @@ Config.set('graphics', 'resizable', False)
 
 from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager
-from kivy.properties import StringProperty
+from kivy.properties import StringProperty, DictProperty
 
 # Importation de nos composants et clients réseaux personnalisés
 import backend_client
@@ -21,7 +21,14 @@ class WindowManager(ScreenManager):
 
 class PandooApp(App):
     product_name = StringProperty("Chargement...")
-    nutrition_info = StringProperty("")
+    nutrition_data = DictProperty({
+        "glucides": "0g",
+        "proteines": "0g",
+        "sucres": "0g",
+        "lipides": "0g",
+        "fibres": "0g",
+        "energie": "0 kcal"
+    })
     pandoo_advice = StringProperty("Analyse en cours...")
     product_allergens = StringProperty("Aucun")
     status_text = StringProperty("Scannez un produit")
@@ -89,13 +96,14 @@ class PandooApp(App):
                 else:
                     self.pandoo_advice = "[color=22cc22]Ce produit semble équilibré pour petit Pandoo ![/color]"
 
-                self.nutrition_info = (
-                    f"[b]Valeurs pour 100g :[/b]\n"
-                    f"Énergie : {val_kcal} kcal\n"
-                    f"Sucres : [color={c_suc}]{val_sucre:.2f}g[/color]  |  Sel : [color={c_sel}]{val_sel:.2f}g[/color]\n"
-                    f"Lipides : [color={c_lip}]{val_lip:.2f}g[/color]  |  Protéines : [color={c_prot}]{val_prot:.2f}g[/color]\n"
-                    f"Glucides : [color={c_glu}]{val_glu:.2f}g[/color]  |  Fibres : [color={c_fib}]{val_fib:.2f}g[/color]"
-                )
+                self.nutrition_data = {
+                    "glucides": f"{val_glu:.1f} g",
+                    "proteines": f"{val_prot:.1f} g",
+                    "sucres": f"{val_sucre:.1f} g",
+                    "lipides": f"{val_lip:.1f} g",
+                    "fibres": f"{val_fib:.1f} g",
+                    "energie": f"{int(val_kcal)} kcal"
+                }
                 
                 product_data = {
                     "barcode": int(code), "name": str(self.product_name),

@@ -9,6 +9,39 @@
     font_name: 'pandoopol.ttf'
 # --------------------------------------
 
+# --- MODÈLE POUR LES CARTES DE NUTRIMENTS KAWAII ---
+<NutrientCard@BoxLayout>:
+    orientation: 'vertical'
+    spacing: '4dp'
+    icon_source: ''
+    nutrient_name: ''
+    nutrient_value: ''
+    size_hint_y: None
+    height: '90dp'
+    Image:
+        source: root.icon_source
+        size_hint_y: None
+        height: '45dp'
+        allow_stretch: True
+        keep_ratio: True
+    Label:
+        text: root.nutrient_name
+        font_size: '12sp'
+        bold: True
+        color: (0.3, 0.3, 0.3, 1)
+        size_hint_y: None
+        height: '15dp'
+        halign: 'center'
+    Label:
+        text: root.nutrient_value
+        font_size: '13sp'
+        bold: True
+        color: (0.1, 0.1, 0.1, 1)
+        size_hint_y: None
+        height: '15dp'
+        halign: 'center'
+# ---------------------------------------------------
+
 <EyeButton@ButtonBehavior+AnchorLayout>:
     size_hint_x: None
     width: '50dp'
@@ -16,7 +49,7 @@
 <BackgroundLayer@Image>:
     source: 'pandoo002.png'
     allow_stretch: True    
-    keep_ratio: True       
+    keep_ratio: True      
     size_hint: (1, 1)      
     pos_hint: {'center_x': 0.5, 'center_y': 0.5} 
     canvas.after:
@@ -25,6 +58,21 @@
         Rectangle:
             pos: self.pos
             size: self.size
+
+# --- NOUVEAU FOND COPIÉ ET PERSONNALISÉ POUR LES VALEURS NUTRITIONNELLES ---
+<NutrientBackgroundLayer@Image>:
+    source: 'pandoo005.png'  # Remplace ici par le nom de ta nouvelle image
+    allow_stretch: True    
+    keep_ratio: True      
+    size_hint: (1, 1)      
+    pos_hint: {'center_x': 0.5, 'center_y': 0.5} 
+    canvas.after:
+        Color:
+            rgba: (0, 0, 0, 0.2)  # Conserve le même filtre d'assombrissement
+        Rectangle:
+            pos: self.pos
+            size: self.size
+# ---------------------------------------------------------------------------
 
 <WindowManager>:
     StartScreen:
@@ -55,7 +103,7 @@
 
 <RoundedButton@Button>:
     background_color: (0, 0, 0, 0)
-    font_size: '18sp'
+    font_size: '16sp'
     bold: True
     canvas.before:
         Color:
@@ -63,7 +111,7 @@
         RoundedRectangle:
             pos: self.pos
             size: self.size
-            radius: [25,]
+            radius: [30,]
 
 <BaseInput@BoxLayout>:
     hint_text: ""
@@ -97,22 +145,37 @@
     name: "start"
     RelativeLayout:
         BackgroundLayer:
+        
         BoxLayout:
             orientation: 'vertical'
-            padding: [40, 80]
-            spacing: 20
+            padding: [40, 20]
+            
+            # 1. Cet espaceur pousse les boutons vers le bas pour ne pas cacher le texte "Pandoo" du fond
+            Widget:
+                size_hint_y: None
+                height: '180dp' # Ajuste cette hauteur pour descendre ou monter les boutons
+
+            # 2. Tes deux boutons vert placés pile au milieu
+            BoxLayout:
+                orientation: 'vertical'
+                size_hint_y: None
+                height: '130dp'
+                spacing: 15
+                
+                RoundedButton:
+                    text: "CONNEXION"
+                    size_hint_y: None
+                    height: '55dp'
+                    on_release: root.manager.current = "login"
+                RoundedButton:
+                    text: "CRÉER UN COMPTE"
+                    size_hint_y: None
+                    height: '55dp'
+                    on_release: root.manager.current = "create_user"
+
+            # 3. Cet espaceur final laisse de la place en bas pour que le panda du fond reste visible
             Widget:
                 size_hint_y: 1
-            RoundedButton:
-                text: "CONNEXION"
-                size_hint_y: None
-                height: '60dp'
-                on_release: root.manager.current = "login"
-            RoundedButton:
-                text: "CRÉER UN COMPTE"
-                size_hint_y: None
-                height: '60dp'
-                on_release: root.manager.current = "create_user"
 
 <CreateUserScreen>:
     name: "create_user"
@@ -326,29 +389,47 @@
     name: "child_list"
     RelativeLayout:
         BackgroundLayer:
+        
+        # Structure verticale principale
         BoxLayout:
             orientation: 'vertical'
             padding: [30, 20]
-            spacing: 20
+            spacing: 15
+
+            # 1. Bouton Retour en haut à gauche
             AnchorLayout:
                 anchor_x: 'left'
                 size_hint_y: None
                 height: '60dp'
                 BackButton:
                     on_release: root.manager.current = "start"
+
+            # 2. Espaceur pour descendre tout le contenu sous le logo "Pandoo" du fond
+            Widget:
+                size_hint_y: None
+                height: '50dp' # Ajuste cette valeur si tu veux descendre encore plus le titre
+
+            # 3. Titre "QUEL PANDOO ?"
             Label:
                 text: "QUEL PANDOO ?"
                 font_size: '28sp'
                 bold: True
                 size_hint_y: None
-                height: '60dp'
+                height: '50dp'
+
+            # 4. Zone de défilement pour la liste des enfants (Amaury, Roy, etc.)
             ScrollView:
+                size_hint_y: 1 # Utilise tout l'espace restant entre le titre et le bouton bas
+                do_scroll_x: False
                 BoxLayout:
-                    id: container
+                    id: container # TRÈS IMPORTANT : Garde cet ID pour que ton code Python injecte les enfants au bon endroit
                     orientation: 'vertical'
                     size_hint_y: None
                     height: self.minimum_height
                     spacing: 15
+                    padding: [0, 10, 0, 20]
+
+            # 5. Bouton d'ajout fixe tout en bas
             RoundedButton:
                 text: "+ AJOUTER UN PANDOO"
                 size_hint_y: None
@@ -382,12 +463,12 @@
             anchor_y: 'top'
             padding: [20, 20]
             Button:
-                text: "< Dernier Scan"
+                text: "< Historique"
                 size_hint: None, None
                 size: '130dp', '45dp'
                 background_color: (0,0,0,0)
                 bold: True
-                on_release: if app.product_name != "Chargement...": root.manager.current = "details"
+                on_release: if app.product_name != "Chargement...": root.manager.current = "history"
                 canvas.before:
                     Color:
                         rgba: (0.15, 0.75, 0.5, 0.7)
@@ -418,7 +499,7 @@
 <DetailsScreen>:
     name: "details"
     RelativeLayout:
-        BackgroundLayer:
+        NutrientBackgroundLayer: # Utilisation du nouveau fond ici
         AnchorLayout:
             anchor_x: 'center'
             anchor_y: 'top'
@@ -482,68 +563,110 @@
                                 size: self.size
                                 radius: [10,]
 
-                    Widget:
+                    # --- GRILLE COMPACTE ET KAWAII DES VALEURS NUTRITIONNELLES ---
+                    GridLayout:
+                        cols: 3
+                        spacing: ['10dp', '15dp']
                         size_hint_y: None
-                        height: '1dp'
-                        canvas:
-                            Color:
-                                rgba: (0.15, 0.75, 0.5, 0.2)
-                            Rectangle:
-                                pos: self.x + 20, self.y
-                                size: self.width - 40, self.height
-                    Label:
-                        text: app.nutrition_info
-                        markup: True
-                        font_size: '14sp'
-                        color: (0.2, 0.2, 0.2, 1)
-                        size_hint_y: None
-                        height: self.texture_size[1]
-                        text_size: self.width, None
-                        halign: 'left'
-        BoxLayout:
-            orientation: 'vertical'
-            size_hint: (0.85, None)
-            height: '170dp'
-            pos_hint: {'center_x': 0.5, 'y': 0.05}
-            spacing: 10
-            RoundedButton:
-                text: "VOIR SUR GOOGLE"
-                on_release: app.open_google_search()
-            RoundedButton:
-                text: "VOIR L'HISTORIQUE"
-                on_release: root.manager.current = "history"
-            RoundedButton:
-                text: "RETOUR AU SCANNER"
-                on_release: root.manager.current = "scan"
+                        height: self.minimum_height
+                        padding: [0, '10dp', 0, 0]
+
+                        NutrientCard:
+                            icon_source: 'glucides.png'
+                            nutrient_name: 'Glucides'
+                            nutrient_value: app.nutrition_data['glucides']
+
+                        NutrientCard:
+                            icon_source: 'proteines.png'
+                            nutrient_name: 'Protéines'
+                            nutrient_value: app.nutrition_data['proteines']
+
+                        NutrientCard:
+                            icon_source: 'sucres.png'
+                            nutrient_name: 'Sucres'
+                            nutrient_value: app.nutrition_data['sucres']
+
+                        NutrientCard:
+                            icon_source: 'lipides.png'
+                            nutrient_name: 'Lipides'
+                            nutrient_value: app.nutrition_data['lipides']
+
+                        NutrientCard:
+                            icon_source: 'fibres.png'
+                            nutrient_name: 'Fibres'
+                            nutrient_value: app.nutrition_data['fibres']
+
+                        NutrientCard:
+                            icon_source: 'energie.png'
+                            nutrient_name: 'Énergie'
+                            nutrient_value: app.nutrition_data['energie']
+
+        # --- ANCHORLAYOUT POUR PLACER FERMEMENT LES BOUTONS RONDS EN BAS ---
+        AnchorLayout:
+            anchor_x: 'center'
+            anchor_y: 'bottom'
+            padding: [20, 20]
+            BoxLayout:
+                orientation: 'horizontal'
+                size_hint: (1, None)
+                height: '55dp'
+                spacing: 10
+                RoundedButton:
+                    text: "GOOGLE"
+                    on_release: app.open_google_search()
+                RoundedButton:
+                    text: "HISTORIQUE"
+                    on_release: root.manager.current = "history"
+                RoundedButton:
+                    text: "SCANNER"
+                    on_release: root.manager.current = "scan"
 
 <HistoryScreen>:
     name: "history"
     RelativeLayout:
         BackgroundLayer:
+        
+        # Structure principale de la page
         BoxLayout:
             orientation: 'vertical'
             padding: [30, 20]
-            spacing: 20
+            spacing: 15
+
+            # Bouton retour tout en haut
             AnchorLayout:
                 anchor_x: 'left'
                 size_hint_y: None
                 height: '60dp'
                 BackButton:
                     on_release: root.manager.current = "child_list"
+            
+            # Espaceur pour descendre le titre sous le logo "Pandoo" du fond
+            Widget:
+                size_hint_y: None
+                height: '40dp'
+
+            # Titre Historique
             Label:
                 text: "HISTORIQUE"
                 font_size: '28sp'
                 bold: True
                 size_hint_y: None
                 height: '40dp'
+            
+            # Zone de défilement (Scroll) pour les produits uniquement
             ScrollView:
+                size_hint_y: 1  # Prend tout l'espace central disponible sans déborder
+                do_scroll_x: False
+                do_scroll_y: True
                 BoxLayout:
                     id: history_container
                     orientation: 'vertical'
                     size_hint_y: None
                     height: self.minimum_height
                     spacing: 12
+                    padding: [0, 10, 0, 10] # Petit espace interne pour respirer
             
+            # Le bouton reste ancré fixement en bas, le contenu du ScrollView s'arrête juste au-dessus
             RoundedButton:
                 text: "SCANNER UN PRODUIT"
                 size_hint_y: None
