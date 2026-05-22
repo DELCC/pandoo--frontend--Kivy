@@ -1,9 +1,10 @@
+
 import requests
 import webbrowser
 from kivy.config import Config
 
 # --- CONFIGURATION DE LA FENÊTRE ---
-Config.set('graphics', 'width', '400')
+Config.set('graphics', 'width', '433')
 Config.set('graphics', 'height', '650')
 Config.set('graphics', 'resizable', False)
 
@@ -104,6 +105,9 @@ class PandooApp(App):
                     "sugars": float(val_sucre), "fibers": float(val_fib)
                 }
                 requests.post(f"{backend_client.BACKEND_URL}/products/?id_child={self.active_child_id}", json=product_data, timeout=5)
+            else:
+                # Si l'API OpenFoodFacts répond une erreur (ex: 500) ou si le produit n'existe pas
+                self.pandoo_advice = "Erreur de connexion."
         except:
             self.pandoo_advice = "Erreur de connexion."
 

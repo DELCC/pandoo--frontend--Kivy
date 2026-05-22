@@ -1,13 +1,24 @@
+# --- DÉFINITION GLOBALE DES POLICES ---
+<Label>:
+    font_name: 'pandoopol.ttf'
+
+<Button>:
+    font_name: 'pandoopol.ttf'
+
+<TextInput>:
+    font_name: 'pandoopol.ttf'
+# --------------------------------------
+
 <EyeButton@ButtonBehavior+AnchorLayout>:
     size_hint_x: None
     width: '50dp'
 
 <BackgroundLayer@Image>:
     source: 'pandoo002.png'
-    allow_stretch: True
-    keep_ratio: False
-    size_hint: (1, 1)
-    pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+    allow_stretch: True    
+    keep_ratio: True       
+    size_hint: (1, 1)      
+    pos_hint: {'center_x': 0.5, 'center_y': 0.5} 
     canvas.after:
         Color:
             rgba: (0, 0, 0, 0.2)
@@ -41,7 +52,6 @@
         text: "< Retour"
         color: (1, 1, 1, 1)
         font_size: '14sp'
-        bold: True
 
 <RoundedButton@Button>:
     background_color: (0, 0, 0, 0)
@@ -91,10 +101,6 @@
             orientation: 'vertical'
             padding: [40, 80]
             spacing: 20
-            Label:
-                text: "PANDOO"
-                font_size: '56sp'
-                bold: True
             Widget:
                 size_hint_y: 1
             RoundedButton:
@@ -166,7 +172,6 @@
                             size_hint: None, None
                             size: '22dp', '22dp'
                             opacity: 0.6
-                
                 BoxLayout:
                     size_hint_y: None
                     height: '65dp' if root.error_msg else '0dp'
