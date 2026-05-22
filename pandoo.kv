@@ -357,34 +357,71 @@
     name: "add_child"
     RelativeLayout:
         BackgroundLayer:
+        
+        # Structure principale
         BoxLayout:
             orientation: 'vertical'
-            padding: [40, 60]
-            spacing: 20
-            Label:
-                text: "AJOUTER UN PANDOO"
-                font_size: '28sp'
-                bold: True
-            BaseInput:
-                id: child_name
-                hint_text: "Prénom"
-            BaseInput:
-                id: child_birthdate
-                hint_text: "Date de naissance (ex: 04072021)"
-            BaseInput:
-                id: child_allergies
-                hint_text: "Allergies (ex: Lait, Gluten, Oeufs)"
-            RoundedButton:
-                text: "AJOUTER UN PANDOO"
+            padding: [30, 20]
+            spacing: 15
+
+            # 1. Bouton Retour tout en haut à gauche
+            AnchorLayout:
+                anchor_x: 'left'
                 size_hint_y: None
                 height: '60dp'
-                on_release: root.create_child(more=True)
-            RoundedButton:
-                text: "VOIR MES PANDOO'S"
-                size_hint_y: None
-                height: '45dp'
-                on_release: root.create_child(more=False)
+                BackButton:
+                    on_release: root.manager.current = "child_list"
 
+            # 2. Espaceur pour descendre le contenu sous le texte "Pandoo" du fond
+            Widget:
+                size_hint_y: None
+                height: '40dp'
+
+            # 3. Titre de la page
+            Label:
+                text: "AJOUTER UN PANDOO"
+                font_size: '26sp'
+                bold: True
+                size_hint_y: None
+                height: '40dp'
+
+            # 4. Zone de saisie scrollable (Prénom, Date, Allergies)
+            ScrollView:
+                size_hint_y: 1
+                do_scroll_x: False
+                BoxLayout:
+                    orientation: 'vertical'
+                    size_hint_y: None
+                    height: self.minimum_height
+                    spacing: 20
+                    padding: [10, 10, 10, 20]
+
+                    BaseInput:
+                        id: child_name
+                        hint_text: "Prénom"
+                    BaseInput:
+                        id: child_birthdate
+                        hint_text: "Date de naissance (ex: 04072021)"
+                    BaseInput:
+                        id: child_allergies
+                        hint_text: "Allergies (ex: Lait, Gluten, Oeufs)"
+
+            # 5. Bloc de boutons fixes en bas
+            BoxLayout:
+                orientation: 'vertical'
+                size_hint_y: None
+                height: '115dp'
+                spacing: 10
+                RoundedButton:
+                    text: "AJOUTER UN PANDOO"
+                    size_hint_y: None
+                    height: '60dp'
+                    on_release: root.create_child(more=True)
+                RoundedButton:
+                    text: "VOIR MES PANDOO'S"
+                    size_hint_y: None
+                    height: '45dp'
+                    on_release: root.create_child(more=False)
 <ChildListScreen>:
     name: "child_list"
     RelativeLayout:
