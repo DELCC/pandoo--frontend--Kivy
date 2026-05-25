@@ -16,6 +16,7 @@
     icon_source: ''
     nutrient_name: ''
     nutrient_value: ''
+    nutrient_color: '111111'  # Couleur par défaut (noir)
     size_hint_y: None
     height: '90dp'
     Image:
@@ -33,10 +34,10 @@
         height: '15dp'
         halign: 'center'
     Label:
-        text: root.nutrient_value
+        text: "[color=" + root.nutrient_color + "]" + root.nutrient_value + "[/color]"
+        markup: True
         font_size: '13sp'
         bold: True
-        color: (0.1, 0.1, 0.1, 1)
         size_hint_y: None
         height: '15dp'
         halign: 'center'
@@ -538,10 +539,12 @@
     RelativeLayout:
         NutrientBackgroundLayer: # Utilisation du nouveau fond ici
         AnchorLayout:
+            box_layout: layout_content
             anchor_x: 'center'
             anchor_y: 'top'
             padding: [25, 40, 25, 0]
             BoxLayout:
+                id: layout_content
                 orientation: 'vertical'
                 size_hint: (1, None)
                 height: self.minimum_height
@@ -600,7 +603,7 @@
                                 size: self.size
                                 radius: [10,]
 
-                    # --- GRILLE COMPACTE ET KAWAII DES VALEURS NUTRITIONNELLES ---
+                    # --- GRILLE DES VALEURS NUTRITIONNELLES CORRIGÉE AVEC LES PROPERTY DIRECTES ---
                     GridLayout:
                         cols: 3
                         spacing: ['10dp', '15dp']
@@ -611,32 +614,38 @@
                         NutrientCard:
                             icon_source: 'glucides.png'
                             nutrient_name: 'Glucides'
-                            nutrient_value: app.nutrition_data['glucides']
+                            nutrient_value: app.val_glucides
+                            nutrient_color: app.c_glucides
 
                         NutrientCard:
                             icon_source: 'proteines.png'
                             nutrient_name: 'Protéines'
-                            nutrient_value: app.nutrition_data['proteines']
+                            nutrient_value: app.val_proteines
+                            nutrient_color: app.c_proteines
 
                         NutrientCard:
                             icon_source: 'sucres.png'
                             nutrient_name: 'Sucres'
-                            nutrient_value: app.nutrition_data['sucres']
+                            nutrient_value: app.val_sucres
+                            nutrient_color: app.c_sucres
 
                         NutrientCard:
                             icon_source: 'lipides.png'
                             nutrient_name: 'Lipides'
-                            nutrient_value: app.nutrition_data['lipides']
+                            nutrient_value: app.val_lipides
+                            nutrient_color: app.c_lipides
 
                         NutrientCard:
                             icon_source: 'fibres.png'
                             nutrient_name: 'Fibres'
-                            nutrient_value: app.nutrition_data['fibres']
+                            nutrient_value: app.val_fibres
+                            nutrient_color: app.c_fibres
 
                         NutrientCard:
                             icon_source: 'energie.png'
                             nutrient_name: 'Énergie'
-                            nutrient_value: app.nutrition_data['energie']
+                            nutrient_value: app.val_energie
+                            nutrient_color: app.c_energie
 
         # --- ANCHORLAYOUT POUR PLACER FERMEMENT LES BOUTONS RONDS EN BAS ---
         AnchorLayout:
