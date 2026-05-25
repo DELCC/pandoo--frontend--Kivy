@@ -1,4 +1,3 @@
-
 import requests
 import webbrowser
 from kivy.config import Config
@@ -10,7 +9,7 @@ Config.set('graphics', 'resizable', False)
 
 from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager
-from kivy.properties import StringProperty, DictProperty
+from kivy.properties import StringProperty
 
 # Importation de nos composants et clients réseaux personnalisés
 import backend_client
@@ -21,14 +20,26 @@ class WindowManager(ScreenManager):
 
 class PandooApp(App):
     product_name = StringProperty("Chargement...")
-    nutrition_data = DictProperty({
-        "glucides": "0g",
-        "proteines": "0g",
-        "sucres": "0g",
-        "lipides": "0g",
-        "fibres": "0g",
-        "energie": "0 kcal"
-    })
+    
+    # --- PROPRIÉTÉS INDIVIDUELLES POUR ÉVITER LES BUGS DE LIAISON KV ---
+    val_glucides = StringProperty("0.0 g")
+    c_glucides = StringProperty("ffffff")
+    
+    val_proteines = StringProperty("0.0 g")
+    c_proteines = StringProperty("ffffff")
+    
+    val_sucres = StringProperty("0.0 g")
+    c_sucres = StringProperty("ffffff")
+    
+    val_lipides = StringProperty("0.0 g")
+    c_lipides = StringProperty("ffffff")
+    
+    val_fibres = StringProperty("0.0 g")
+    c_fibres = StringProperty("ffffff")
+    
+    val_energie = StringProperty("0 kcal")
+    c_energie = StringProperty("22cc22")
+    
     pandoo_advice = StringProperty("Analyse en cours...")
     product_allergens = StringProperty("Aucun")
     status_text = StringProperty("Scannez un produit")
@@ -96,14 +107,24 @@ class PandooApp(App):
                 else:
                     self.pandoo_advice = "[color=22cc22]Ce produit semble équilibré pour petit Pandoo ![/color]"
 
-                self.nutrition_data = {
-                    "glucides": f"{val_glu:.1f} g",
-                    "proteines": f"{val_prot:.1f} g",
-                    "sucres": f"{val_sucre:.1f} g",
-                    "lipides": f"{val_lip:.1f} g",
-                    "fibres": f"{val_fib:.1f} g",
-                    "energie": f"{int(val_kcal)} kcal"
-                }
+                # --- MISE À JOUR EN DIRECT DES STRINGPROPERTY POUR LE FICHIER KV ---
+                self.val_glucides = f"{val_glu:.1f} g"
+                self.c_glucides = c_glu
+                
+                self.val_proteines = f"{val_prot:.1f} g"
+                self.c_proteines = c_prot
+                
+                self.val_sucres = f"{val_sucre:.1f} g"
+                self.c_sucres = c_suc
+                
+                self.val_lipides = f"{val_lip:.1f} g"
+                self.c_lipides = c_lip
+                
+                self.val_fibres = f"{val_fib:.1f} g"
+                self.c_fibres = c_fib
+                
+                self.val_energie = f"{int(val_kcal)} kcal"
+                self.c_energie = "22cc22"
                 
                 product_data = {
                     "barcode": int(code), "name": str(self.product_name),
@@ -114,7 +135,6 @@ class PandooApp(App):
                 }
                 requests.post(f"{backend_client.BACKEND_URL}/products/?id_child={self.active_child_id}", json=product_data, timeout=5)
             else:
-                # Si l'API OpenFoodFacts répond une erreur (ex: 500) ou si le produit n'existe pas
                 self.pandoo_advice = "Erreur de connexion."
         except:
             self.pandoo_advice = "Erreur de connexion."
