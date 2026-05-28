@@ -131,9 +131,13 @@ class PandooApp(App):
                     "brand": str(p.get('brands', 'Marque inconnue')), "type": str(p.get('categories', 'Aliment')),
                     "calories": float(val_kcal), "glucides": float(val_glu), "calcium": float(val_calcium),
                     "proteins": float(val_prot), "lipids": float(val_lip), "salt": float(val_sel),
-                    "sugars": float(val_sucre), "fibers": float(val_fib)
+                    "sugars": float(val_sucre), "fibers": float(val_fib),
+                    "id_child": int(self.active_child_id)  # <-- AJOUT : L'ID de l'enfant est maintenant inclus dans le JSON envoyé
                 }
-                requests.post(f"{backend_client.BACKEND_URL}/products/?id_child={self.active_child_id}", json=product_data, timeout=5)
+                
+                # Envoi au backend : l'ID de l'enfant est également conservé en paramètre d'URL (selon ta route actuelle)
+                res = requests.post(f"{backend_client.BACKEND_URL}/products/?id_child={self.active_child_id}", json=product_data, timeout=5)
+                return res
             else:
                 self.pandoo_advice = "Erreur de connexion."
         except:
