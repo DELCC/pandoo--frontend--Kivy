@@ -403,9 +403,29 @@
                     BaseInput:
                         id: child_birthdate
                         hint_text: "Date de naissance (ex: 04072021)"
-                    BaseInput:
-                        id: child_allergies
-                        hint_text: "Allergies (ex: Lait, Gluten, Oeufs)"
+                    
+                    # --- MENU DÉROULANT DES ALLERGÈNES ---
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: None
+                        height: '55dp'
+                        canvas.before:
+                            Color:
+                                rgba: (1, 1, 1, 0.95)
+                            RoundedRectangle:
+                                pos: self.pos
+                                size: self.size
+                                radius: [15,]
+                        Spinner:
+                            id: child_allergies
+                            text: "Sélectionner un allergène"
+                            values: ["Aucun"] + root.ALLERGENES_REFERENCE
+                            background_normal: ''
+                            background_color: (0, 0, 0, 0)
+                            foreground_color: (0.1, 0.1, 0.1, 1)
+                            font_size: '16sp'
+                            color: (0.1, 0.1, 0.1, 1) if self.text != "Sélectionner un allergène" else (0.5, 0.5, 0.5, 1)
+                            on_text: root.on_allergen_text_change(self.text)
 
             # 5. Bloc de boutons fixes en bas
             BoxLayout:
@@ -423,6 +443,7 @@
                     size_hint_y: None
                     height: '45dp'
                     on_release: root.create_child(more=False)
+
 <ChildListScreen>:
     name: "child_list"
     RelativeLayout:
