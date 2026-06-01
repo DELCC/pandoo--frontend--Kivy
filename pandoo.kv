@@ -9,6 +9,17 @@
     font_name: 'pandoopol.ttf'
 # --------------------------------------
 
+# --- CORRECTION ICI : ON FIXE LA HAUTEUR DES OPTIONS DU SPINNER ---
+<SpinnerOption>:
+    background_normal: ''
+    background_color: (0.15, 0.75, 0.5, 0.95) # Vert menthe pandoo
+    color: (1, 1, 1, 1) # Blanc
+    font_name: 'pandoopol.ttf'
+    font_size: '16sp'
+    size_hint_y: None
+    height: '45dp' # Évite que les options s'étirent à l'infini vers le haut et le bas
+# -------------------------------------------------------------------
+
 # --- MODÈLE POUR LES CARTES DE NUTRIMENTS KAWAII ---
 <NutrientCard@BoxLayout>:
     orientation: 'vertical'
@@ -16,7 +27,7 @@
     icon_source: ''
     nutrient_name: ''
     nutrient_value: ''
-    nutrient_color: '111111'  # Couleur par défaut (noir)
+    nutrient_color: '111111'  
     size_hint_y: None
     height: '90dp'
     Image:
@@ -30,17 +41,21 @@
         font_size: '12sp'
         bold: True
         color: (0.3, 0.3, 0.3, 1)
-        size_hint_y: None
+        size_hint: (1, None)
         height: '15dp'
         halign: 'center'
+        valign: 'middle'
+        text_size: self.size
     Label:
         text: "[color=" + root.nutrient_color + "]" + root.nutrient_value + "[/color]"
         markup: True
         font_size: '13sp'
         bold: True
-        size_hint_y: None
+        size_hint: (1, None)
         height: '15dp'
         halign: 'center'
+        valign: 'middle'
+        text_size: self.size
 # ---------------------------------------------------
 
 <EyeButton@ButtonBehavior+AnchorLayout>:
@@ -60,20 +75,18 @@
             pos: self.pos
             size: self.size
 
-# --- NOUVEAU FOND COPIÉ ET PERSONNALISÉ POUR LES VALEURS NUTRITIONNELLES ---
 <NutrientBackgroundLayer@Image>:
-    source: 'pandoo005.png'  # Remplace ici par le nom de ta nouvelle image
+    source: 'pandoo005.png'  
     allow_stretch: True    
     keep_ratio: True      
     size_hint: (1, 1)      
     pos_hint: {'center_x': 0.5, 'center_y': 0.5} 
     canvas.after:
         Color:
-            rgba: (0, 0, 0, 0.2)  # Conserve le même filtre d'assombrissement
+            rgba: (0, 0, 0, 0.2)  
         Rectangle:
             pos: self.pos
             size: self.size
-# ---------------------------------------------------------------------------
 
 <WindowManager>:
     StartScreen:
@@ -146,23 +159,17 @@
     name: "start"
     RelativeLayout:
         BackgroundLayer:
-        
         BoxLayout:
             orientation: 'vertical'
             padding: [40, 20]
-            
-            # 1. Cet espaceur pousse les boutons vers le bas pour ne pas cacher le texte "Pandoo" du fond
             Widget:
                 size_hint_y: None
-                height: '180dp' # Ajuste cette hauteur pour descendre ou monter les boutons
-
-            # 2. Tes deux boutons vert placés pile au milieu
+                height: '180dp' 
             BoxLayout:
                 orientation: 'vertical'
                 size_hint_y: None
                 height: '130dp'
                 spacing: 15
-                
                 RoundedButton:
                     text: "CONNEXION"
                     size_hint_y: None
@@ -173,8 +180,6 @@
                     size_hint_y: None
                     height: '55dp'
                     on_release: root.manager.current = "create_user"
-
-            # 3. Cet espaceur final laisse de la place en bas pour que le panda du fond reste visible
             Widget:
                 size_hint_y: 1
 
@@ -358,35 +363,25 @@
     name: "add_child"
     RelativeLayout:
         BackgroundLayer:
-        
-        # Structure principale
         BoxLayout:
             orientation: 'vertical'
             padding: [30, 20]
             spacing: 15
-
-            # 1. Bouton Retour tout en haut à gauche
             AnchorLayout:
                 anchor_x: 'left'
                 size_hint_y: None
                 height: '60dp'
                 BackButton:
                     on_release: root.manager.current = "child_list"
-
-            # 2. Espaceur pour descendre le contenu sous le texte "Pandoo" du fond
             Widget:
                 size_hint_y: None
                 height: '40dp'
-
-            # 3. Titre de la page
             Label:
                 text: "AJOUTER UN PANDOO"
                 font_size: '26sp'
                 bold: True
                 size_hint_y: None
                 height: '40dp'
-
-            # 4. Zone de saisie scrollable (Prénom, Date, Allergies)
             ScrollView:
                 size_hint_y: 1
                 do_scroll_x: False
@@ -396,7 +391,6 @@
                     height: self.minimum_height
                     spacing: 20
                     padding: [10, 10, 10, 20]
-
                     BaseInput:
                         id: child_name
                         hint_text: "Prénom"
@@ -404,11 +398,12 @@
                         id: child_birthdate
                         hint_text: "Date de naissance (ex: 04072021)"
                     
-                    # --- MENU DÉROULANT DES ALLERGÈNES ---
+                    # --- RE-DESIGN DU BLOC SPINNER POUR ÉVITER LES BUGS VISUELS ---
                     BoxLayout:
                         orientation: 'horizontal'
                         size_hint_y: None
                         height: '55dp'
+                        padding: [0, 0, 10, 0]
                         canvas.before:
                             Color:
                                 rgba: (1, 1, 1, 0.95)
@@ -416,18 +411,39 @@
                                 pos: self.pos
                                 size: self.size
                                 radius: [15,]
+                        TextInput:
+                            id: allergen_display
+                            text: "Sélectionner un allergène"
+                            readonly: True
+                            multiline: False
+                            background_normal: ''
+                            background_active: ''
+                            background_color: (0, 0, 0, 0)
+                            
+                            # 🎯 Supprime le curseur rouge clignotant en le rendant transparent
+                            cursor_color: (0, 0, 0, 0)
+                            
+                            foreground_color: (0.1, 0.1, 0.1, 1) if self.text != "Sélectionner un allergène" else (0.5, 0.5, 0.5, 1)
+                            font_name: 'pandoopol.ttf'
+                            font_size: '16sp'
+                            padding: [20, 16, 10, 0]
+                            on_touch_down: if self.collide_point(*args[1].pos): child_allergies.is_open = True
+
                         Spinner:
                             id: child_allergies
-                            text: "Sélectionner un allergène"
+                            text: "▼"
                             values: ["Aucun"] + root.ALLERGENES_REFERENCE
+                            size_hint_x: None
+                            width: '40dp'
+                            font_size: '14sp'
                             background_normal: ''
                             background_color: (0, 0, 0, 0)
-                            foreground_color: (0.1, 0.1, 0.1, 1)
-                            font_size: '16sp'
-                            color: (0.1, 0.1, 0.1, 1) if self.text != "Sélectionner un allergène" else (0.5, 0.5, 0.5, 1)
+                            color: (0.5, 0.5, 0.5, 1)
                             on_text: root.on_allergen_text_change(self.text)
+                            
+                            # 💡 Optionnel mais correct : Spécifie la classe des lignes du menu (déjà actif par défaut)
+                            option_cls: 'SpinnerOption'
 
-            # 5. Bloc de boutons fixes en bas
             BoxLayout:
                 orientation: 'vertical'
                 size_hint_y: None
@@ -448,47 +464,35 @@
     name: "child_list"
     RelativeLayout:
         BackgroundLayer:
-        
-        # Structure verticale principale
         BoxLayout:
             orientation: 'vertical'
             padding: [30, 20]
             spacing: 15
-
-            # 1. Bouton Retour en haut à gauche
             AnchorLayout:
                 anchor_x: 'left'
                 size_hint_y: None
                 height: '60dp'
                 BackButton:
                     on_release: root.manager.current = "start"
-
-            # 2. Espaceur pour descendre tout le contenu sous le logo "Pandoo" du fond
             Widget:
                 size_hint_y: None
-                height: '50dp' # Ajuste cette valeur si tu veux descendre encore plus le titre
-
-            # 3. Titre "QUEL PANDOO ?"
+                height: '50dp' 
             Label:
                 text: "QUEL PANDOO ?"
                 font_size: '28sp'
                 bold: True
                 size_hint_y: None
                 height: '50dp'
-
-            # 4. Zone de défilement pour la liste des enfants (Amaury, Roy, etc.)
             ScrollView:
-                size_hint_y: 1 # Utilise tout l'espace restant entre le titre et le bouton bas
+                size_hint_y: 1 
                 do_scroll_x: False
                 BoxLayout:
-                    id: container # TRÈS IMPORTANT : Garde cet ID pour que ton code Python injecte les enfants au bon endroit
+                    id: container 
                     orientation: 'vertical'
                     size_hint_y: None
                     height: self.minimum_height
                     spacing: 15
                     padding: [0, 10, 0, 20]
-
-            # 5. Bouton d'ajout fixe tout en bas
             RoundedButton:
                 text: "+ AJOUTER UN PANDOO"
                 size_hint_y: None
@@ -516,8 +520,8 @@
             color: (0.15, 0.75, 0.5, 1)
             bold: True
             font_size: '18sp'
-        
         AnchorLayout:
+            box_layout: None
             anchor_x: 'left'
             anchor_y: 'top'
             padding: [20, 20]
@@ -535,8 +539,8 @@
                         pos: self.pos
                         size: self.size
                         radius: [15,]
-
         AnchorLayout:
+            box_layout: None
             anchor_x: 'right'
             anchor_y: 'top'
             padding: [20, 20]
@@ -558,7 +562,7 @@
 <DetailsScreen>:
     name: "details"
     RelativeLayout:
-        NutrientBackgroundLayer: # Utilisation du nouveau fond ici
+        NutrientBackgroundLayer: 
         AnchorLayout:
             box_layout: layout_content
             anchor_x: 'center'
@@ -607,7 +611,6 @@
                         height: self.texture_size[1]
                         text_size: self.width, None
                         halign: 'center'
-                    
                     Button:
                         text: "ALLERGÈNES"
                         size_hint_y: None
@@ -623,53 +626,44 @@
                                 pos: self.pos
                                 size: self.size
                                 radius: [10,]
-
-                    # --- GRILLE DES VALEURS NUTRITIONNELLES CORRIGÉE AVEC LES PROPERTY DIRECTES ---
                     GridLayout:
                         cols: 3
                         spacing: ['10dp', '15dp']
                         size_hint_y: None
                         height: self.minimum_height
                         padding: [0, '10dp', 0, 0]
-
                         NutrientCard:
                             icon_source: 'glucides.png'
                             nutrient_name: 'Glucides'
                             nutrient_value: app.val_glucides
                             nutrient_color: app.c_glucides
-
                         NutrientCard:
                             icon_source: 'proteines.png'
                             nutrient_name: 'Protéines'
                             nutrient_value: app.val_proteines
                             nutrient_color: app.c_proteines
-
                         NutrientCard:
                             icon_source: 'sucres.png'
                             nutrient_name: 'Sucres'
                             nutrient_value: app.val_sucres
                             nutrient_color: app.c_sucres
-
                         NutrientCard:
                             icon_source: 'lipides.png'
                             nutrient_name: 'Lipides'
                             nutrient_value: app.val_lipides
                             nutrient_color: app.c_lipides
-
                         NutrientCard:
                             icon_source: 'fibres.png'
                             nutrient_name: 'Fibres'
                             nutrient_value: app.val_fibres
                             nutrient_color: app.c_fibres
-
                         NutrientCard:
                             icon_source: 'energie.png'
                             nutrient_name: 'Énergie'
                             nutrient_value: app.val_energie
                             nutrient_color: app.c_energie
-
-        # --- ANCHORLAYOUT POUR PLACER FERMEMENT LES BOUTONS RONDS EN BAS ---
         AnchorLayout:
+            box_layout: None
             anchor_x: 'center'
             anchor_y: 'bottom'
             padding: [20, 20]
@@ -692,37 +686,27 @@
     name: "history"
     RelativeLayout:
         BackgroundLayer:
-        
-        # Structure principale de la page
         BoxLayout:
             orientation: 'vertical'
             padding: [30, 20]
             spacing: 15
-
-            # Bouton retour tout en haut
             AnchorLayout:
                 anchor_x: 'left'
                 size_hint_y: None
                 height: '60dp'
                 BackButton:
                     on_release: root.manager.current = "child_list"
-            
-            # Espaceur pour descendre le titre sous le logo "Pandoo" du fond
             Widget:
                 size_hint_y: None
                 height: '40dp'
-
-            # Titre Historique
             Label:
                 text: "HISTORIQUE"
                 font_size: '28sp'
                 bold: True
                 size_hint_y: None
                 height: '40dp'
-            
-            # Zone de défilement (Scroll) pour les produits uniquement
             ScrollView:
-                size_hint_y: 1  # Prend tout l'espace central disponible sans déborder
+                size_hint_y: 1  
                 do_scroll_x: False
                 do_scroll_y: True
                 BoxLayout:
@@ -731,9 +715,7 @@
                     size_hint_y: None
                     height: self.minimum_height
                     spacing: 12
-                    padding: [0, 10, 0, 10] # Petit espace interne pour respirer
-            
-            # Le bouton reste ancré fixement en bas, le contenu du ScrollView s'arrête juste au-dessus
+                    padding: [0, 10, 0, 10]
             RoundedButton:
                 text: "SCANNER UN PRODUIT"
                 size_hint_y: None

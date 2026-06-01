@@ -1,3 +1,5 @@
+
+
 import requests
 import webbrowser
 from kivy.config import Config
@@ -6,10 +8,11 @@ from kivy.config import Config
 Config.set('graphics', 'width', '433')
 Config.set('graphics', 'height', '650')
 Config.set('graphics', 'resizable', False)
+Config.set('graphics', 'multisamples', '0')
 
 from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager
-from kivy.properties import StringProperty
+from kivy.properties import StringProperty, NumericProperty
 
 # Importation de nos composants et clients réseaux personnalisés
 import backend_client
@@ -17,6 +20,10 @@ import screens
 
 class WindowManager(ScreenManager):
     pass
+
+from kivy.app import App
+from kivy.properties import StringProperty, NumericProperty, BooleanProperty
+# ... conserve tes autres imports (requests, webbrowser, WindowManager, etc.) ...
 
 class PandooApp(App):
     product_name = StringProperty("Chargement...")
@@ -44,10 +51,17 @@ class PandooApp(App):
     product_allergens = StringProperty("Aucun")
     status_text = StringProperty("Scannez un produit")
     
+    # 🌟 GESTION DYNAMIQUE DE LA POPUP DE RÉCOMPENSE
+    texte_recompense = StringProperty("")
+    doit_afficher_popup = BooleanProperty(False) # Détermine si la popup doit s'ouvrir ou non
+    
     user_id = 0 
     active_child_id = 1
     active_child_birthdate = "2020-01-01"
     active_child_allergies = StringProperty("")
+
+    # 🔢 COMPTEUR ABSOLU D'ARTICLES SCANNÉS
+    articles_scannes = NumericProperty(0)
 
     TRANSLATIONS = {"Milk": "Lait", "Nuts": "Noisettes", "Eggs": "Œufs", "Peanuts": "Arachides", "Soybeans": "Soja", "Wheat": "Blé", "Hazelnuts": "Noisettes"}
 
@@ -62,6 +76,23 @@ class PandooApp(App):
             res_off = requests.get(url_off, headers=headers, timeout=5)
             
             if res_off.status_code == 200 and res_off.json().get("status") == 1:
+                # 🔢 1. Incrémentation du compteur d'articles
+                self.articles_scannes += 1
+                
+                # 🚨 2. FILTRE DE LA POPUP : Uniquement à 1 scan du palier (4, 9, 14, 19...)
+                if (self.articles_scannes + 1) % 5 == 0:
+                    self.doit_afficher_popup = True
+                    prochain_palier = self.articles_scannes + 1
+                    
+                    # Alternance Histoire (5, 15, 25...) / Quiz (10, 20, 30...)
+                    if (prochain_palier // 5) % 2 == 1:
+                        self.texte_recompense = "Plus qu'un article à scanner pour débloquer ton histoire magique !"
+                    else:
+                        self.texte_recompense = "Plus qu'un article à scanner pour débloquer ton quiz surprise !"
+                else:
+                    # Pour tous les autres articles (1, 2, 3, 5, 6, 7, 8...), on bloque la popup
+                    self.doit_afficher_popup = False
+
                 p = res_off.json()["product"]
                 n = p.get("nutriments", {})
                 self.product_name = p.get('product_name', 'Produit inconnu')
@@ -132,16 +163,17 @@ class PandooApp(App):
                     "calories": float(val_kcal), "glucides": float(val_glu), "calcium": float(val_calcium),
                     "proteins": float(val_prot), "lipids": float(val_lip), "salt": float(val_sel),
                     "sugars": float(val_sucre), "fibers": float(val_fib),
-                    "id_child": int(self.active_child_id)  # <-- AJOUT : L'ID de l'enfant est maintenant inclus dans le JSON envoyé
+                    "id_child": int(self.active_child_id)
                 }
                 
-                # Envoi au backend : l'ID de l'enfant est également conservé en paramètre d'URL (selon ta route actuelle)
                 res = requests.post(f"{backend_client.BACKEND_URL}/products/?id_child={self.active_child_id}", json=product_data, timeout=5)
                 return res
             else:
                 self.pandoo_advice = "Erreur de connexion."
+                self.doit_afficher_popup = False
         except:
             self.pandoo_advice = "Erreur de connexion."
+            self.doit_afficher_popup = False
 
     def build(self):
         return WindowManager()
