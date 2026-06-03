@@ -1,268 +1,180 @@
-import cv2
-import urllib.request
-import numpy as np
+
+
 import requests
-import threading
+import webbrowser
+from kivy.config import Config
+
+# --- CONFIGURATION DE LA FENÊTRE ---
+Config.set('graphics', 'width', '433')
+Config.set('graphics', 'height', '650')
+Config.set('graphics', 'resizable', False)
+Config.set('graphics', 'multisamples', '0')
+
 from kivy.app import App
-from kivy.uix.screenmanager import ScreenManager, Screen
-from kivy.clock import Clock
-from kivy.graphics.texture import Texture
-from kivy.properties import StringProperty
-from pyzbar.pyzbar import decode
-from kivy.lang import Builder
+from kivy.uix.screenmanager import ScreenManager
+from kivy.properties import StringProperty, NumericProperty
 
-# --- CONFIGURATION ---
-URL_IMAGE = "http://192.168.1.157:8080/shot.jpg"
-MY_API_URL = "http://127.0.0.1:8000/products/"
+# Importation de nos composants et clients réseaux personnalisés
+import backend_client
+import screens
 
-Builder.load_string('''
-<WindowManager>:
-    ScanScreen:
-    DetailsScreen:
+class WindowManager(ScreenManager):
+    pass
 
-<ScanScreen>:
-    name: "scan"
-    BoxLayout:
-        orientation: 'vertical'
-        Image:
-            id: camera_preview
-            size_hint_y: 0.8
-        Label:
-            text: app.status_text
-            size_hint_y: 0.2
-            font_size: '20sp'
-            bold: True
-
-<DetailsScreen>:
-    name: "details"
-    BoxLayout:
-        orientation: 'vertical'
-        padding: 20
-        spacing: 10
-        
-        Label:
-            text: app.product_name
-            font_size: '24sp'
-            bold: True
-            size_hint_y: None
-            height: '50dp'
-            color: (0.2, 0.6, 1, 1)
-            halign: 'center'
-            valign: 'middle'
-            text_size: self.width, None
-
-        # --- LA CORRECTION : Ajout de la mention 100g ---
-        Label:
-            text: "Valeurs indiquées pour 100g"
-            font_size: '14sp'
-            italic: True
-            color: (0.8, 0.8, 0.8, 1)
-            size_hint_y: None
-            height: '30dp'
-            halign: 'center'
-
-        GridLayout:
-            cols: 2
-            spacing: 10
-            padding: 15
-            canvas.before:
-                Color:
-                    rgba: (0.15, 0.15, 0.15, 1)
-                RoundedRectangle:
-                    pos: self.pos
-                    size: self.size
-                    radius: [10,]
-            
-            # --- Lignes nutritionnelles ---
-            Label:
-                text: "Calories:"
-                bold: True
-                halign: 'left'
-                text_size: self.size
-            Label:
-                id: val_energy
-                text: "..."
-                halign: 'right'
-                text_size: self.size
-
-            Label:
-                text: "Glucides:"
-                bold: True
-                halign: 'left'
-                text_size: self.size
-            Label:
-                id: val_glucides
-                text: "..."
-                halign: 'right'
-                text_size: self.size
-
-            Label:
-                text: "Lipides:"
-                bold: True
-                halign: 'left'
-                text_size: self.size
-            Label:
-                id: val_fat
-                text: "..."
-                halign: 'right'
-                text_size: self.size
-
-            Label:
-                text: "Protéines:"
-                bold: True
-                halign: 'left'
-                text_size: self.size
-            Label:
-                id: val_proteins
-                text: "..."
-                halign: 'right'
-                text_size: self.size
-
-            Label:
-                text: "Sel:"
-                bold: True
-                halign: 'left'
-                text_size: self.size
-            Label:
-                id: val_salt
-                text: "..."
-                halign: 'right'
-                text_size: self.size
-
-            Label:
-                text: "Calcium:"
-                bold: True
-                halign: 'left'
-                text_size: self.size
-            Label:
-                id: val_calcium
-                text: "..."
-                halign: 'right'
-                text_size: self.size
-
-        Button:
-            text: "FERMER ET REVENIR AU SCAN"
-            size_hint_y: None
-            height: '65dp'
-            background_color: (0.9, 0.2, 0.2, 1)
-            background_normal: ''
-            bold: True
-            on_release: root.manager.current = "scan"
-''')
-
-class ScanScreen(Screen):
-    def on_enter(self):
-        app = App.get_running_app()
-        app.status_text = "Prêt à scanner"
-        self.last_scanned = None
-        self.update_event = Clock.schedule_interval(self.update, 1.0 / 60.0)
-
-    def on_leave(self):
-        Clock.unschedule(self.update_event)
-
-    def update(self, dt):
-        try:
-            img_resp = urllib.request.urlopen(URL_IMAGE, timeout=2)
-            img_np = np.array(bytearray(img_resp.read()), dtype=np.uint8)
-            frame = cv2.imdecode(img_np, -1)
-            if frame is not None:
-                barcodes = decode(frame)
-                for barcode in barcodes:
-                    code = barcode.data.decode('utf-8')
-                    if code != self.last_scanned:
-                        self.last_scanned = code
-                        threading.Thread(target=self.process_new_scan, args=(code,)).start()
-                
-                buf = cv2.flip(frame, 0).tobytes()
-                texture = Texture.create(size=(frame.shape[1], frame.shape[0]), colorfmt='bgr')
-                texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
-                self.ids.camera_preview.texture = texture
-        except:
-            pass
-
-    def process_new_scan(self, code):
-        app = App.get_running_app()
-        Clock.schedule_once(lambda dt: setattr(app, 'status_text', "RECHERCHE..."))
-        
-        try:
-            headers = {'User-Agent': 'PandooApp - 1.0'}
-            url = f"https://world.openfoodfacts.org/api/v2/product/{code}"
-            res = requests.get(url, headers=headers, timeout=5)
-            
-            if res.status_code == 200:
-                data = res.json()
-                if data.get('status') == 1:
-                    p = data.get('product', {})
-                    nut = p.get('nutriments', {})
-                    
-                    payload = {
-                        "barcode": int(code),
-                        "type": "Alimentation",
-                        "name": str(p.get('product_name_fr') or p.get('product_name') or "Article"),
-                        "brand": str(p.get('brands', 'INCONNU').split(',')[0].strip()),
-                        "calories": float(nut.get('energy-kcal_100g', 0.0)),
-                        "glucides": float(nut.get('carbohydrates_100g', 0.0)),
-                        "calcium": float(nut.get('calcium_100g', 0.0)),
-                        "proteins": float(nut.get('proteins_100g', 0.0)),
-                        "lipids": float(nut.get('fat_100g', 0.0)),
-                        "salt": float(nut.get('salt_100g', 0.0))
-                    }
-                    
-                    Clock.schedule_once(lambda dt: self.update_details_ui(payload))
-                    Clock.schedule_once(lambda dt: self.switch_to_details())
-                    self.send_to_backend(payload)
-                else:
-                    Clock.schedule_once(lambda dt: setattr(app, 'status_text', "Produit inconnu"))
-        except Exception as e:
-            print(f"Erreur: {e}")
-
-    def update_details_ui(self, p):
-        app = App.get_running_app()
-        app.product_name = f"{p['brand'].upper()} - {p['name']}"
-        
-        ds = app.root.get_screen('details')
-        ds.ids.val_energy.text = f"{p['calories']} kcal"
-        ds.ids.val_glucides.text = f"{p['glucides']} g"
-        ds.ids.val_fat.text = f"{p['lipids']} g"
-        ds.ids.val_proteins.text = f"{p['proteins']} g"
-        ds.ids.val_salt.text = f"{p['salt']} g"
-        ds.ids.val_calcium.text = f"{p['calcium']} mg"
-
-    def switch_to_details(self):
-        self.manager.current = "details"
-
-    def send_to_backend(self, data):
-        try:
-            target_url = "http://127.0.0.1:8000/products/?id_child=1"
-            res = requests.post(target_url, json=data, timeout=5)
-            
-            if res.status_code == 200:
-                # Le backend renvoie le produit (existant ou nouveau)
-                server_data = res.json()
-                
-                # On peut vérifier si le message de log du backend contenait "déjà existant"
-                # Ou plus simplement, si le backend est configuré pour renvoyer 200, 
-                # on affiche un message clair ici.
-                
-                # Pour un affichage précis, on se base sur la logique du backend :
-                print(f"--- [API INFO] ---")
-                print(f"Produit : {data['name']}")
-                # On affiche le message de succès uniquement
-                print(f"✅ Opération réussie (Article déjà stocké dans l'API)")
-            
-            # Note : Si tu veux un message "DÉJÀ ENREGISTRÉ" spécifique dans Kivy,
-            # il est préférable que le Backend renvoie un code 201 pour "créé" 
-            # et 200 pour "déjà présent".
-        except Exception as e:
-            print(f"❌ Backend injoignable : {e}")
-
-class DetailsScreen(Screen): pass
-class WindowManager(ScreenManager): pass
+from kivy.app import App
+from kivy.properties import StringProperty, NumericProperty, BooleanProperty
+# ... conserve tes autres imports (requests, webbrowser, WindowManager, etc.) ...
 
 class PandooApp(App):
-    product_name = StringProperty("")
-    status_text = StringProperty("Prêt à scanner")
+    product_name = StringProperty("Chargement...")
     
+    # --- PROPRIÉTÉS INDIVIDUELLES POUR ÉVITER LES BUGS DE LIAISON KV ---
+    val_glucides = StringProperty("0.0 g")
+    c_glucides = StringProperty("ffffff")
+    
+    val_proteines = StringProperty("0.0 g")
+    c_proteines = StringProperty("ffffff")
+    
+    val_sucres = StringProperty("0.0 g")
+    c_sucres = StringProperty("ffffff")
+    
+    val_lipides = StringProperty("0.0 g")
+    c_lipides = StringProperty("ffffff")
+    
+    val_fibres = StringProperty("0.0 g")
+    c_fibres = StringProperty("ffffff")
+    
+    val_energie = StringProperty("0 kcal")
+    c_energie = StringProperty("22cc22")
+    
+    pandoo_advice = StringProperty("Analyse en cours...")
+    product_allergens = StringProperty("Aucun")
+    status_text = StringProperty("Scannez un produit")
+    
+    # 🌟 GESTION DYNAMIQUE DE LA POPUP DE RÉCOMPENSE
+    texte_recompense = StringProperty("")
+    doit_afficher_popup = BooleanProperty(False) # Détermine si la popup doit s'ouvrir ou non
+    
+    user_id = 0 
+    active_child_id = 1
+    active_child_birthdate = "2020-01-01"
+    active_child_allergies = StringProperty("")
+
+    # 🔢 COMPTEUR ABSOLU D'ARTICLES SCANNÉS
+    articles_scannes = NumericProperty(0)
+
+    TRANSLATIONS = {"Milk": "Lait", "Nuts": "Noisettes", "Eggs": "Œufs", "Peanuts": "Arachides", "Soybeans": "Soja", "Wheat": "Blé", "Hazelnuts": "Noisettes"}
+
+    def open_google_search(self):
+        query = self.product_name.replace("\n", " ").replace(" ", "+")
+        webbrowser.open(f"https://www.google.com/search?q={query}")
+
+    def save_to_backend(self, code):
+        headers = {'User-Agent': 'PandooApp - Python/Kivy'}
+        try:
+            url_off = f"https://world.openfoodfacts.org/api/v0/product/{code}.json"
+            res_off = requests.get(url_off, headers=headers, timeout=5)
+            
+            if res_off.status_code == 200 and res_off.json().get("status") == 1:
+                # 🔢 1. Incrémentation du compteur d'articles
+                self.articles_scannes += 1
+                
+                # 🚨 2. FILTRE DE LA POPUP : Uniquement à 1 scan du palier (4, 9, 14, 19...)
+                if (self.articles_scannes + 1) % 5 == 0:
+                    self.doit_afficher_popup = True
+                    prochain_palier = self.articles_scannes + 1
+                    
+                    # Alternance Histoire (5, 15, 25...) / Quiz (10, 20, 30...)
+                    if (prochain_palier // 5) % 2 == 1:
+                        self.texte_recompense = "Plus qu'un article à scanner pour débloquer ton histoire magique !"
+                    else:
+                        self.texte_recompense = "Plus qu'un article à scanner pour débloquer ton quiz surprise !"
+                else:
+                    # Pour tous les autres articles (1, 2, 3, 5, 6, 7, 8...), on bloque la popup
+                    self.doit_afficher_popup = False
+
+                p = res_off.json()["product"]
+                n = p.get("nutriments", {})
+                self.product_name = p.get('product_name', 'Produit inconnu')
+                
+                all_text = p.get('allergens_from_ingredients', '') or p.get('allergens', '')
+                raw_items = all_text.replace("en:", "").replace("fr:", "").split(",")
+                clean_list = []
+                for item in raw_items:
+                    name = item.strip().capitalize()
+                    if name:
+                        translated = self.TRANSLATIONS.get(name, name)
+                        if translated not in clean_list: clean_list.append(translated)
+                
+                final_allergens = [a for a in clean_list if not (a == "Nuts" and "Noisettes" in clean_list or a == "Milk" and "Lait" in clean_list)]
+                self.product_allergens = ", ".join(sorted(final_allergens)) if final_allergens else "Aucun allergène détecté"
+
+                val_kcal = float(n.get('energy-kcal_100g', 0))
+                val_sucre = round(float(n.get('sugars_100g', 0)), 2)
+                val_sel = round(float(n.get('salt_100g', 0)), 2)
+                val_lip = round(float(n.get('fat_100g', 0)), 2)
+                val_glu = round(float(n.get('carbohydrates_100g', 0)), 2)
+                val_fib = round(float(n.get('fiber_100g', 0)), 2)
+                val_prot = round(float(n.get('proteins_100g', 0)), 2)
+                val_calcium = round(float(n.get('calcium_100g', 0)), 3)
+
+                def get_c(v, s_e, s_o, reverse=False):
+                    if not reverse:
+                        return "22cc22" if v <= s_e else "ff9900" if v <= s_o else "ff3333"
+                    return "22cc22" if v >= s_e else "ff9900" if v >= s_o else "ff3333"
+
+                c_suc, c_sel = get_c(val_sucre, 5.0, 13.5), get_c(val_sel, 0.3, 0.9)
+                c_lip, c_glu = get_c(val_lip, 3.0, 20.0), get_c(val_glu, 30.0, 50.0)
+                c_prot, c_fib = get_c(val_prot, 8.0, 4.0, reverse=True), get_c(val_fib, 5.0, 2.5, reverse=True)
+
+                if val_sucre > 13.5 and val_sel > 0.9:
+                    self.pandoo_advice = "[color=ff3333]• Ce produit est beaucoup trop riche en sucre ET en sel ![/color]"
+                elif val_sucre > 13.5:
+                    self.pandoo_advice = "[color=ff3333]• Dans un fruit, le sucre vient avec plein de vitamines. C'est le sucre champion ![/color]"
+                elif val_sel > 0.9:
+                    self.pandoo_advice = "[color=ff3333]• Manger moins de sel, c'est le secret pour ton petit cœur ![/color]"
+                elif val_fib < 2.5:
+                    self.pandoo_advice = "[color=ff9900]• Ce produit manque de fibres, amies de ton ventre ![/color]"
+                else:
+                    self.pandoo_advice = "[color=22cc22]Ce produit semble équilibré pour petit Pandoo ![/color]"
+
+                # --- MISE À JOUR EN DIRECT DES STRINGPROPERTY POUR LE FICHIER KV ---
+                self.val_glucides = f"{val_glu:.1f} g"
+                self.c_glucides = c_glu
+                
+                self.val_proteines = f"{val_prot:.1f} g"
+                self.c_proteines = c_prot
+                
+                self.val_sucres = f"{val_sucre:.1f} g"
+                self.c_sucres = c_suc
+                
+                self.val_lipides = f"{val_lip:.1f} g"
+                self.c_lipides = c_lip
+                
+                self.val_fibres = f"{val_fib:.1f} g"
+                self.c_fibres = c_fib
+                
+                self.val_energie = f"{int(val_kcal)} kcal"
+                self.c_energie = "22cc22"
+                
+                product_data = {
+                    "barcode": int(code), "name": str(self.product_name),
+                    "brand": str(p.get('brands', 'Marque inconnue')), "type": str(p.get('categories', 'Aliment')),
+                    "calories": float(val_kcal), "glucides": float(val_glu), "calcium": float(val_calcium),
+                    "proteins": float(val_prot), "lipids": float(val_lip), "salt": float(val_sel),
+                    "sugars": float(val_sucre), "fibers": float(val_fib),
+                    "id_child": int(self.active_child_id)
+                }
+                
+                res = requests.post(f"{backend_client.BACKEND_URL}/products/?id_child={self.active_child_id}", json=product_data, timeout=5)
+                return res
+            else:
+                self.pandoo_advice = "Erreur de connexion."
+                self.doit_afficher_popup = False
+        except:
+            self.pandoo_advice = "Erreur de connexion."
+            self.doit_afficher_popup = False
+
     def build(self):
         return WindowManager()
 
